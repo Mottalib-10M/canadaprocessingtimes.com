@@ -1,0 +1,33 @@
+---
+import PageLayout from '../../layouts/PageLayout.astro';
+import LegalIdentity from '../../components/LegalIdentity.astro';
+import { route } from '../../i18n/routes';
+import { AUTHOR_NAME, AUTHOR_DESC, CONTACT_EMAIL } from '../../data/site-config';
+import { srcLink } from '../../lib/helpers';
+import { HOME } from '../../content/home';
+import { KIT as K } from '../../lib/kit';
+import { profilePageSchema, breadcrumbSchema } from '../../lib/seo';
+const lang = 'fr';
+const path = route('about', lang);
+const title = 'Éditeur et sources de Délais de traitement Canada, 2026';
+const description = 'Délais de traitement Canada est édité par Radif Partners : délais d’IRCC relus chaque semaine en 2026, archivés avec leur date, sans compte et sans consultant.';
+const s = (k: string, t: string) => srcLink(k, lang, t);
+---
+<PageLayout title={title} description={description} lang={lang} jsonLd={[profilePageSchema({ path, lang }), breadcrumbSchema([{ name: 'Accueil', path: route('home', lang) }, { name: 'À propos', path }])]} breadcrumbs={[{ label: 'À propos' }]}>
+  <article class="prose prose-slate max-w-none">
+    <h1>À propos de Délais de traitement Canada</h1>
+    <p>{AUTHOR_DESC.fr}</p>
+    <h2>Pourquoi ce site</h2>
+    <p>Qui cherche un délai de traitement d’IRCC trouve surtout deux sortes de pages. L’outil d’IRCC donne un chiffre pour une demande à la fois, le remplace chaque semaine et ne garde aucun historique : impossible de savoir si un délai monte ou descend. Les sites d’actualité sur l’immigration et les consultants publient des tableaux recopiés de cet outil un jour donné, souvent vieux de plusieurs semaines, à côté d’un formulaire qui demande votre courriel ou propose une évaluation payante. Aucun ne dit quand votre propre demande pourrait être tranchée.</p>
+    <p><strong>{HOME.fr.valeur}</strong></p>
+    <h2>Qui l’édite</h2>
+    <p>Le site est édité par {AUTHOR_NAME}, une société qui construit des calculateurs à partir de données publiques. Ce n’est ni un organisme public, ni IRCC, ni un consultant en immigration réglementé, ni un cabinet d’avocats. Il ne vend rien, ne touche aucune commission, n’oriente vers aucun représentant et ne demande ni nom, ni courriel, ni téléphone. Les pages ne portent aucun lien d’affiliation.</p>
+    <LegalIdentity lang={lang} />
+    <h2>D’où viennent les chiffres</h2>
+    <p>Des fichiers qui alimentent l’outil <Fragment set:html={s('ptimes', 'Vérifier les délais de traitement')} /> d’IRCC : <Fragment set:html={s('ptimes-country', 'délais par pays')} />, <Fragment set:html={s('ptimes-noncountry', 'délais uniques')} />, <Fragment set:html={s('ptimes-flpt', 'délais prospectifs')} /> et <Fragment set:html={s('ptimes-week', 'files hebdomadaires des prolongations')} />, relus après chaque mise à jour et gardés avec leur date ({K.fr.n(K.readingsCount('noncountry'))} mises à jour du fichier des délais uniques à ce jour). Les mises à jour plus anciennes viennent des copies conservées par l’Internet Archive, chacune citée avec sa date de capture. Les rondes d’Entrée express viennent de la page des <Fragment set:html={s('ee-rounds', 'rondes d’invitations')} /> d’IRCC. La <a href={route('method', lang)}>page de méthode</a> donne chaque règle ; la <a href={route('editorial', lang)}>politique éditoriale</a> explique comment les erreurs sont corrigées.</p>
+    <h2>Ce que le site ne fait pas</h2>
+    <p>Il ne voit jamais une demande, ne peut pas vérifier un état de dossier et ne peut rien accélérer. Ses dates sont des estimations tirées des chiffres publiés par IRCC : une information, ni un avis juridique ni une promesse. Pour votre dossier, les <Fragment set:html={s('check-status', 'outils de suivi')} /> d’IRCC font foi.</p>
+    <h2>Nous écrire</h2>
+    <p><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>, pour signaler une erreur ou un chiffre qui diffère de celui d’IRCC.</p>
+  </article>
+</PageLayout>

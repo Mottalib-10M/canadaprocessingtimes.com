@@ -1,0 +1,27 @@
+---
+import PageLayout from '../../layouts/PageLayout.astro';
+import LegalIdentity from '../../components/LegalIdentity.astro';
+import { CONTACT_EMAIL } from '../../data/site-config';
+import { route } from '../../i18n/routes';
+import { contactPageSchema } from '../../lib/seo';
+const lang = 'en';
+const path = route('contact', lang);
+const description = 'Write to the publisher of Canada Processing Times about a 2026 figure, a date or a source. Email only: no form, no account, no consultant and no service to sell you.';
+---
+<PageLayout title="Contact Canada Processing Times 2026: corrections, sources" description={description} lang={lang} noindex={true} jsonLd={[contactPageSchema({ name: 'Contact', description, path, lang })]} breadcrumbs={[{ label: 'Contact' }]} showAuthor={false}>
+  <div class="prose prose-slate max-w-none">
+    <h1>Contact</h1>
+    <p>Write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. There is no form, no phone line and no account: one address, read by the people who keep the archive and the calculators up to date.</p>
+    <h2>Messages that help</h2>
+    <ul>
+      <li>A time or a date that differs from what IRCC’s tool shows: give the application type, the country and the date you looked.</li>
+      <li>An IRCC line this site does not follow yet.</li>
+      <li>An older copy of IRCC’s files, with its date, that would fill a gap in the archive.</li>
+      <li>Embedding the calculator on a community or student site: the code is on the <a href={route('widget', lang)}>embed page</a>.</li>
+    </ul>
+    <h2>What we cannot do</h2>
+    <p>We cannot see, check or speed up an application, and we do not give legal advice. For your own file, use your IRCC account or IRCC’s web form. We do not refer anyone to a consultant or a lawyer.</p>
+    <h2>Publisher</h2>
+    <LegalIdentity lang={lang} />
+  </div>
+</PageLayout>

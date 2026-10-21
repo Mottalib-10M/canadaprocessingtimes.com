@@ -1,0 +1,33 @@
+---
+import PageLayout from '../../layouts/PageLayout.astro';
+import LegalIdentity from '../../components/LegalIdentity.astro';
+import { route } from '../../i18n/routes';
+import { AUTHOR_NAME, AUTHOR_DESC, CONTACT_EMAIL } from '../../data/site-config';
+import { srcLink } from '../../lib/helpers';
+import { HOME } from '../../content/home';
+import { KIT as K } from '../../lib/kit';
+import { profilePageSchema, breadcrumbSchema } from '../../lib/seo';
+const lang = 'en';
+const path = route('about', lang);
+const title = 'Publisher and Sources of Canada Processing Times, 2026';
+const description = 'Canada Processing Times is published by Radif Partners: IRCC processing times read each week in 2026, archived with their dates, no account, no consultant.';
+const s = (k: string, t: string) => srcLink(k, lang, t);
+---
+<PageLayout title={title} description={description} lang={lang} jsonLd={[profilePageSchema({ path, lang }), breadcrumbSchema([{ name: 'Home', path: route('home', lang) }, { name: 'About', path }])]} breadcrumbs={[{ label: 'About' }]}>
+  <article class="prose prose-slate max-w-none">
+    <h1>About Canada Processing Times</h1>
+    <p>{AUTHOR_DESC.en}</p>
+    <h2>Why this site exists</h2>
+    <p>Someone who searches for an IRCC processing time mostly finds two kinds of pages. IRCC’s own tool gives one figure for one application at a time, replaces it every week and keeps no history, so there is no way to tell whether a time is rising or falling. Immigration news sites and consultants publish tables copied from that tool on a given day, often weeks old, next to a form that asks for your email or offers a paid assessment. Neither tells you when your own application could be decided.</p>
+    <p><strong>{HOME.en.valeur}</strong></p>
+    <h2>Who publishes it</h2>
+    <p>The site is published by {AUTHOR_NAME}, a company that builds calculators from public data. It is not a government body, not IRCC, not a licensed immigration consultant and not a law firm. It sells nothing, takes no commission, refers no one to a representative and asks for no name, email or phone number. Pages carry no affiliate links.</p>
+    <LegalIdentity lang={lang} />
+    <h2>Where the figures come from</h2>
+    <p>The files behind IRCC’s <Fragment set:html={s('ptimes', 'Check processing times')} /> tool: <Fragment set:html={s('ptimes-country', 'times by country')} />, <Fragment set:html={s('ptimes-noncountry', 'single times')} />, <Fragment set:html={s('ptimes-flpt', 'forward-looking times')} /> and <Fragment set:html={s('ptimes-week', 'weekly extension queues')} />, read after each update and kept with their dates ({K.en.n(K.readingsCount('noncountry'))} updates of the single-time file so far). Older updates come from copies kept by the Internet Archive, each cited with its capture date. Express Entry rounds come from IRCC’s <Fragment set:html={s('ee-rounds', 'rounds of invitations')} />. The <a href={route('method', lang)}>method page</a> gives every rule; the <a href={route('editorial', lang)}>editorial policy</a> explains how corrections are made.</p>
+    <h2>What the site does not do</h2>
+    <p>It never sees an application, cannot check a status and cannot speed anything up. Its dates are estimates built from IRCC’s published figures: information, not legal advice and not a promise. For your own file, IRCC’s <Fragment set:html={s('check-status', 'status tools')} /> are the reference.</p>
+    <h2>Write to us</h2>
+    <p><a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>, to report an error or a figure that differs from IRCC’s.</p>
+  </article>
+</PageLayout>

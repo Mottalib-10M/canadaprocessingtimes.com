@@ -1,0 +1,20 @@
+{
+ "accent": "#A3122B",
+ "symbol": "⧗",
+ "variants": [
+  {
+   "file": "og-en.png",
+   "title": "IRCC processing times\nwith their history",
+   "subtitle": "Estimated decision date · trend · country comparison",
+   "badge": "Archived every week from IRCC's published times",
+   "brand": "Canada Processing Times"
+  },
+  {
+   "file": "og-fr.png",
+   "title": "Délais de traitement IRCC\navec leur historique",
+   "subtitle": "Date de décision estimée · tendance · comparaison des pays",
+   "badge": "Relevé chaque semaine d'après les délais publiés par IRCC",
+   "brand": "Délais de traitement Canada"
+  }
+ ]
+}

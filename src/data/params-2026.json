@@ -1,0 +1,285 @@
+{
+  "_lisezmoi": "Paramètres et sources du site (RECETTE-SITE.md §4). Les délais eux-mêmes ne sont pas ici : ils viennent des fichiers publiés par IRCC, relus par scripts/ircc/update-data.mjs (src/data/ircc/). Ici : la règle de présence physique de la citoyenneté et la liste des sources citées. Relu sur les pages officielles le 2026-10-21.",
+  "year": 2026,
+  "retrieved_at": "2026-10-21",
+  "valid_from": "2026-01-01",
+  "valid_to": "2026-12-31",
+  "citizenship": {
+    "_source": "citizenship-eligibility + citizenship-act (art. 5(1)c) et 5(1.001)) : 1 095 jours de présence physique dans les 5 ans précédant la date de la demande ; chaque jour passé au Canada comme résident temporaire ou personne protégée avant d'être résident permanent compte pour une demi-journée, au plus 365 jours.",
+    "required": 1095,
+    "window": 1825,
+    "tempRatio": 0.5,
+    "tempCap": 365
+  },
+  "sources": {
+    "ptimes": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/demande/verifier-delais-traitement.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/application/check-processing-times.html",
+      "label": {
+        "fr": "IRCC : Vérifier les délais de traitement",
+        "en": "IRCC: Check processing times"
+      }
+    },
+    "ptimes-country": {
+      "url": "https://www.canada.ca/content/dam/ircc/documents/json/data-ptime-en.json",
+      "label": {
+        "fr": "IRCC : fichier des délais par pays (data-ptime-en.json)",
+        "en": "IRCC: processing times by country file (data-ptime-en.json)"
+      }
+    },
+    "ptimes-noncountry": {
+      "url": "https://www.canada.ca/content/dam/ircc/documents/json/data-ptime-non-country-en.json",
+      "label": {
+        "fr": "IRCC : fichier des délais sans pays (data-ptime-non-country-en.json)",
+        "en": "IRCC: processing times file, not by country (data-ptime-non-country-en.json)"
+      }
+    },
+    "ptimes-flpt": {
+      "url": "https://www.canada.ca/content/dam/ircc/documents/json/flpt-en.json",
+      "label": {
+        "fr": "IRCC : délais prospectifs, résidence permanente et citoyenneté (flpt-en.json)",
+        "en": "IRCC: forward-looking times, permanent residence and citizenship (flpt-en.json)"
+      }
+    },
+    "ptimes-week": {
+      "url": "https://www.canada.ca/content/dam/ircc/documents/json/flpt-by-week-en.json",
+      "label": {
+        "fr": "IRCC : délais prospectifs par semaine, prolongations de permis (flpt-by-week-en.json)",
+        "en": "IRCC: forward-looking times by week, permit extensions (flpt-by-week-en.json)"
+      }
+    },
+    "ee-rounds": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/immigrer-canada/entree-express/rondes-invitations.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/rounds-invitations.html",
+      "label": {
+        "fr": "IRCC : Rondes d’invitations d’Entrée express",
+        "en": "IRCC: Express Entry rounds of invitations"
+      }
+    },
+    "ee-data": {
+      "url": "https://www.canada.ca/content/dam/ircc/documents/json/ee_rounds_123_en.json",
+      "label": {
+        "fr": "IRCC : fichier des rondes d’Entrée express (ee_rounds_123_en.json)",
+        "en": "IRCC: Express Entry rounds file (ee_rounds_123_en.json)"
+      }
+    },
+    "express-entry": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/immigrer-canada/entree-express.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry.html",
+      "label": {
+        "fr": "IRCC : Entrée express",
+        "en": "IRCC: Express Entry"
+      }
+    },
+    "citizenship-eligibility": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/citoyennete-canadienne/devenir-citoyen-canadien/admissibilite.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-citizenship/become-canadian-citizen/eligibility.html",
+      "label": {
+        "fr": "IRCC : Admissibilité à la citoyenneté canadienne",
+        "en": "IRCC: Eligibility for Canadian citizenship"
+      }
+    },
+    "citizenship-act": {
+      "url": "https://laws-lois.justice.gc.ca/fra/lois/c-29/page-1.html",
+      "url_en": "https://laws-lois.justice.gc.ca/eng/acts/c-29/page-1.html",
+      "label": {
+        "fr": "Loi sur la citoyenneté (L.R.C. 1985, ch. C-29), article 5",
+        "en": "Citizenship Act (R.S.C. 1985, c. C-29), section 5"
+      }
+    },
+    "citizenship-proof": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/citoyennete-canadienne/preuve-citoyennete.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/canadian-citizenship/proof-citizenship.html",
+      "label": {
+        "fr": "IRCC : Preuve de citoyenneté",
+        "en": "IRCC: Proof of citizenship"
+      }
+    },
+    "check-status": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/demande/verifier-etat.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/application/check-status.html",
+      "label": {
+        "fr": "IRCC : Vérifier l’état de votre demande",
+        "en": "IRCC: Check your application status"
+      }
+    },
+    "account": {
+      "url": "https://www.canada.ca/en/immigration-refugees-citizenship/services/application/account.html",
+      "label": {
+        "fr": "IRCC : Comptes en ligne (page en anglais)",
+        "en": "IRCC: Sign in to your account"
+      }
+    },
+    "biometrics": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/campagnes/biometrie.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/campaigns/biometrics.html",
+      "label": {
+        "fr": "IRCC : Biométrie",
+        "en": "IRCC: Biometrics"
+      }
+    },
+    "visit": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/visiter-canada.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/visit-canada.html",
+      "label": {
+        "fr": "IRCC : Visiter le Canada",
+        "en": "IRCC: Visit Canada"
+      }
+    },
+    "eta": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/visiter-canada/ave.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/visit-canada/eta.html",
+      "label": {
+        "fr": "IRCC : Autorisation de voyage électronique (AVE)",
+        "en": "IRCC: Electronic Travel Authorization (eTA)"
+      }
+    },
+    "super-visa": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/visiter-canada/super-visa-parents-grands-parents.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/visit-canada/parent-grandparent-super-visa.html",
+      "label": {
+        "fr": "IRCC : Super visa pour parents et grands-parents",
+        "en": "IRCC: Parent and grandparent super visa"
+      }
+    },
+    "extend-stay": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/visiter-canada/prolonger-sejour.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/visit-canada/extend-stay.html",
+      "label": {
+        "fr": "IRCC : Prolonger votre séjour",
+        "en": "IRCC: Extend your stay"
+      }
+    },
+    "study-permit": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/etudier-canada/permis-etudes.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/study-canada/study-permit.html",
+      "label": {
+        "fr": "IRCC : Permis d’études",
+        "en": "IRCC: Study permit"
+      }
+    },
+    "extend-study": {
+      "url": "https://www.canada.ca/en/immigration-refugees-citizenship/services/study-canada/extend-study-permit.html",
+      "label": {
+        "fr": "IRCC : Prolonger un permis d’études (page en anglais)",
+        "en": "IRCC: Extend your study permit"
+      }
+    },
+    "work-permit": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/travailler-canada/permis.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/work-canada/permit.html",
+      "label": {
+        "fr": "IRCC : Permis de travail",
+        "en": "IRCC: Work permit"
+      }
+    },
+    "extend-work": {
+      "url": "https://www.canada.ca/en/immigration-refugees-citizenship/services/work-canada/permit/temporary/extend.html",
+      "label": {
+        "fr": "IRCC : Prolonger un permis de travail (page en anglais)",
+        "en": "IRCC: Extend your work permit"
+      }
+    },
+    "pgwp": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/etudier-canada/travail/apres-obtention-diplome.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/study-canada/work/after-graduation.html",
+      "label": {
+        "fr": "IRCC : Travailler au Canada après l’obtention du diplôme",
+        "en": "IRCC: Work in Canada after you graduate"
+      }
+    },
+    "iec": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/travailler-canada/eic.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/work-canada/iec.html",
+      "label": {
+        "fr": "IRCC : Expérience internationale Canada",
+        "en": "IRCC: International Experience Canada"
+      }
+    },
+    "pnp": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/immigrer-canada/candidats-provinces.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/provincial-nominees.html",
+      "label": {
+        "fr": "IRCC : Candidats des provinces",
+        "en": "IRCC: Provincial Nominee Program"
+      }
+    },
+    "qsw": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/immigrer-canada/travailleurs-qualifies-quebec.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/quebec-skilled-workers.html",
+      "label": {
+        "fr": "IRCC : Travailleurs qualifiés sélectionnés par le Québec",
+        "en": "IRCC: Quebec-selected skilled workers"
+      }
+    },
+    "aip": {
+      "url": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/atlantic-immigration.html",
+      "label": {
+        "fr": "IRCC : Programme d’immigration au Canada atlantique (page en anglais)",
+        "en": "IRCC: Atlantic Immigration Program"
+      }
+    },
+    "caregivers": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/immigrer-canada/aides-familiaux.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/caregivers.html",
+      "label": {
+        "fr": "IRCC : Aides familiaux",
+        "en": "IRCC: Caregivers"
+      }
+    },
+    "spouse": {
+      "url": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/family-sponsorship/spouse-partner-children.html",
+      "label": {
+        "fr": "IRCC : Parrainer un époux, un conjoint ou un enfant (page en anglais)",
+        "en": "IRCC: Sponsor your spouse, partner or children"
+      }
+    },
+    "pgp": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/immigrer-canada/parrainer-membre-famille/parrainer-parents-grands-parents.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/family-sponsorship/sponsor-parents-grandparents.html",
+      "label": {
+        "fr": "IRCC : Parrainer vos parents et grands-parents",
+        "en": "IRCC: Sponsor your parents and grandparents"
+      }
+    },
+    "startup": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/immigrer-canada/visa-demarrage.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/start-visa.html",
+      "label": {
+        "fr": "IRCC : Programme de visa pour démarrage d’entreprise",
+        "en": "IRCC: Start-up Visa Program"
+      }
+    },
+    "pr-card": {
+      "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/nouveaux-immigrants/carte-rp.html",
+      "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/new-immigrants/pr-card.html",
+      "label": {
+        "fr": "IRCC : Carte de résident permanent",
+        "en": "IRCC: Permanent resident card"
+      }
+    },
+    "terms": {
+      "url": "https://www.canada.ca/fr/transparence/avis.html",
+      "url_en": "https://www.canada.ca/en/transparency/terms.html",
+      "label": {
+        "fr": "Canada.ca : Avis (conditions d’utilisation et reproduction)",
+        "en": "Canada.ca: Terms and conditions (reproduction)"
+      }
+    },
+    "open-data": {
+      "url": "https://open.canada.ca/data/fr/dataset/9b34e712-513f-44e9-babf-9df4f7256550",
+      "url_en": "https://open.canada.ca/data/en/dataset/9b34e712-513f-44e9-babf-9df4f7256550",
+      "label": {
+        "fr": "Gouvernement ouvert : Traitement opérationnel, mises à jour mensuelles d’IRCC",
+        "en": "Open Government: Operational Processing, Monthly IRCC Updates"
+      }
+    },
+    "wayback": {
+      "url": "https://web.archive.org/web/*/https://www.canada.ca/content/dam/ircc/documents/json/*",
+      "label": {
+        "fr": "Internet Archive : captures des fichiers IRCC (Wayback Machine)",
+        "en": "Internet Archive: captures of the IRCC files (Wayback Machine)"
+      }
+    }
+  }
+}

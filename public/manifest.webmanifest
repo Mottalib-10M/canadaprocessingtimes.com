@@ -1,0 +1,21 @@
+{
+ "name": "Canada Processing Times",
+ "short_name": "Processing Times",
+ "description": "IRCC processing times by program and country with their history since 2024, an estimated decision date for your file, the trend, and the latest Express Entry draws.",
+ "start_url": "/en/",
+ "display": "standalone",
+ "background_color": "#ffffff",
+ "theme_color": "#A3122B",
+ "icons": [
+  {
+   "src": "/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png"
+  }
+ ]
+}

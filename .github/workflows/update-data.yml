@@ -1,0 +1,74 @@
+name: IRCC processing times update and deploy
+
+# Chaque jour vers 9 h 30 (heure de l'Est) : IRCC met à jour ses fichiers de délais environ une fois par semaine,
+# sans jour fixe, et ses délais prospectifs environ une fois par mois. Le script relit les quatre fichiers et les
+# rondes d'Entrée express ; une nouvelle date publiée par IRCC ajoute un relevé daté à l'archive
+# (src/data/ircc/history.json), versionnée ici. Puis le site est reconstruit et publié sur GitHub Pages.
+on:
+  schedule:
+    - cron: "30 13 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Read IRCC files (scheduled and manual runs)
+        if: github.event_name != 'push'
+        run: npm run update-data
+
+      - name: Tests
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
+
+      - name: Commit the new readings
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/data/ircc/ src/data/site-config.ts
+          git diff --cached --quiet || (git commit -m "Délais IRCC relus le $(date -u +%F)" && git push)
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

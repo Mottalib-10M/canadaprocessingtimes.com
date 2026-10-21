@@ -1,0 +1,52 @@
+---
+/** Method: the IRCC files, the two kinds of time, the estimate, the archive, the limits. Every figure from the kit. */
+import PageLayout from '../../layouts/PageLayout.astro';
+import { route } from '../../i18n/routes';
+import { KIT as K } from '../../lib/kit';
+import { srcLink, table } from '../../lib/helpers';
+import { breadcrumbSchema, webPageSchema } from '../../lib/seo';
+const lang = 'en';
+const path = route('method', lang);
+const E = K.en, D = K.L.dates;
+const title = 'IRCC Processing Times Method 2026: Files, Estimates, Archive';
+const description = 'How this site reads IRCC processing times in 2026: the four official files, past and forward-looking times, the decision-date estimate and the dated archive.';
+const s = (k: string, t: string) => srcLink(k, lang, t);
+const files = (['country', 'noncountry', 'flpt', 'tr'] as const).map((f) => [
+  { country: 'Times by country of filing', noncountry: 'Single times (no country)', flpt: 'Permanent residence and citizenship (forward-looking)', tr: 'Permit extensions, by week (forward-looking)' }[f],
+  E.day(D[f]), E.n(K.readingsCount(f)), E.day(K.firstReading(f)!), E.n(K.archivedCount(f)),
+]);
+const wp = K.readingOf('work-ext');
+---
+<PageLayout title={title} description={description} lang={lang} jsonLd={[webPageSchema({ name: 'Method', description, path, lang }), breadcrumbSchema([{ name: 'Home', path: route('home', lang) }, { name: 'Method', path }])]} breadcrumbs={[{ label: 'Method' }]}>
+  <article class="prose prose-slate max-w-none">
+    <h1>How the figures are built</h1>
+    <p>Every time on this site comes from the files that feed IRCC’s own <Fragment set:html={s('ptimes', 'Check processing times')} /> tool on canada.ca. A script reads them after each update ({E.day(K.READ)} for this edition), keeps the date IRCC put on each file, and adds the reading to a dated archive. Nothing is reported by users, nothing is copied from another site, and nothing you type into a calculator leaves your browser.</p>
+    <h2>The four files</h2>
+    <ul>
+      <li><Fragment set:html={s('ptimes-country', 'Times by country')} />: visitor visa, super visa, study permit, work permit and dependent children, one time for each country of filing; the line coded Canada covers applications made from inside Canada.</li>
+      <li><Fragment set:html={s('ptimes-noncountry', 'Single times')} />: one time for everyone, such as a visitor record, a permit extension, an eTA, a PR card or a search of citizenship records.</li>
+      <li><Fragment set:html={s('ptimes-flpt', 'Forward-looking times')} />: permanent residence programs, family sponsorship, refugees and citizenship, with the number of people waiting and a queue by month of filing.</li>
+      <li><Fragment set:html={s('ptimes-week', 'Weekly queues')} />: study and work permit extensions, with a queue by week of filing.</li>
+    </ul>
+    <Fragment set:html={table(['File', 'Latest IRCC update', 'Updates kept', 'Oldest', 'From archived copies'], files, `Our archive of each IRCC file, as of ${E.day(K.READ)}.`, ['l', 'l', 'r', 'l', 'r'], lang)} />
+    <p>Express Entry rounds come from the <Fragment set:html={s('ee-data', 'rounds file')} /> behind IRCC’s <Fragment set:html={s('ee-rounds', 'rounds of invitations page')} />: date, category, number of invitations and lowest score invited.</p>
+    <h2>Past and forward-looking times</h2>
+    <p>IRCC publishes two kinds of figure. A <strong>past time</strong>, used for visas, permits and documents, is the delay within which IRCC finished 80% of the applications it decided recently; it describes others’ files, and one in five took longer. A <strong>forward-looking time</strong>, used for permanent residence and citizenship, is IRCC’s projection for an application received today, from its inventory, staffing and expected intake. Both start on the day IRCC receives a complete application and end at the decision (the oath for citizenship). Neither includes the time to give biometrics or to answer a request for documents.</p>
+    <h2>The estimated decision date</h2>
+    <p>Estimate = date IRCC received the complete application + published time, in IRCC’s own unit. A time in months is added as calendar months and shown to the month; a time in days or weeks is added in days and shown to the day. Without a filing date, the tool uses the date the files were read, which answers “if I apply now”.</p>
+    <p>For the lines that have a queue, the tool also reads IRCC’s row for your month of filing (or your week, counted as days 1 to 7, 8 to 14 and so on, as in IRCC’s weekly file). When IRCC gives a time left, the expected decision is the date of IRCC’s update plus that time; when IRCC writes that it needs more time for that period, the result says so instead of giving a date. For a work permit extension, for example, IRCC counts {K.fmtAhead(wp.waiting ?? 0, 'en')} applications waiting at its update of {E.day(wp.date)}.</p>
+    <h2>Trends and the archive</h2>
+    <p>Each reading is stored as a number of days, aligned on the update dates of its file. The trend compares the latest figure with the one before it: a change of less than 5% and less than two days is shown as unchanged. The range gives the lowest and highest values kept, with their dates.</p>
+    <p>Updates older than our first direct reading come from copies of the same files kept by the Internet Archive’s <Fragment set:html={s('wayback', 'Wayback Machine')} />. Each copy is read once, its IRCC date is taken from the file itself, and the capture date is cited next to every figure. Two copies of the same IRCC update count once. A week with no copy has no point: the archive is never interpolated, and no figure before the oldest copy is shown.</p>
+    <h2>Countries</h2>
+    <p>Country names are the standard names of the country codes used by IRCC, with two exceptions IRCC itself makes: Gaza and the West Bank are listed separately. The country is where you apply from, normally your country of residence. Lines for countries with very few applications swing from week to week; the tables on this site lead with the countries that file the most.</p>
+    <h2>Citizenship presence</h2>
+    <p>The presence calculator applies the rule of the <Fragment set:html={s('citizenship-act', 'Citizenship Act, section 5')} /> as explained on IRCC’s <Fragment set:html={s('citizenship-eligibility', 'eligibility page')} />: {E.n(K.P.citizenship.required)} days in the five years before the application; each day as a temporary resident or protected person before permanent residence counts as half a day, up to {E.n(K.P.citizenship.tempCap)} days. It does not replace IRCC’s official calculator, which works from exact travel dates.</p>
+    <h2>Licence and reuse</h2>
+    <p>The figures are facts published by the Government of Canada and are cited with their source and date. Under the <Fragment set:html={s('terms', 'canada.ca terms')} />, this site does not reproduce IRCC’s pages, tables or wordmarks, and it is not affiliated with or endorsed by IRCC. Other IRCC statistics are published under the Open Government Licence on the <Fragment set:html={s('open-data', 'open data portal')} />.</p>
+    <h2>What is left out</h2>
+    <p>Individual files: the site never sees an application. Lines IRCC marks as having no time or not enough data are shown that way, never filled in. Fees, eligibility rules beyond citizenship presence and CRS scores are outside this site.</p>
+    <h2>Checks</h2>
+    <p>Automated tests check date arithmetic on month ends, the units of each figure, the half-day credit and its cap, the reading of queues marked as late, the alignment of every archived series and the categories of Express Entry rounds. If a file cannot be read, the previous one is kept, and the pages show the IRCC date actually read.</p>
+  </article>
+</PageLayout>
