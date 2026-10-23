@@ -1,5 +1,5 @@
 /** Configuration centrale du site (générée par new-site.py). */
-export const SITE_URL = "https://ca-ircc-delais.example";
+export const SITE_URL = "https://canadaprocessingtimes.com";
 export const SITE_NAMES: Record<string, string> = {"en": "Canada Processing Times", "fr": "Délais de traitement Canada"};
 export const LANG_TAGS: Record<string, string> = {"en": "en-CA", "fr": "fr-CA"};
 export const OG_LOCALES: Record<string, string> = {"en": "en_CA", "fr": "fr_CA"};
@@ -16,7 +16,7 @@ export const AUTHOR_DESC: Record<string, string> = {"en": "Radif Partners reads 
  *  themes reellement traites par le site, pas une liste de mots-cles : un sujet
  *  declare ici sans page qui le couvre est une declaration fausse. */
 export const KNOWS_ABOUT: Record<string, string[]> = {"en": ["IRCC processing times", "Visitor visa and study permit processing", "Work permits and post-graduation work permits", "Express Entry rounds of invitations", "Family sponsorship processing", "Canadian citizenship physical presence"], "fr": ["Délais de traitement d'IRCC", "Traitement des visas de visiteur et des permis d'études", "Permis de travail et permis post-diplôme", "Rondes d'invitations d'Entrée express", "Traitement du parrainage familial", "Présence effective pour la citoyenneté canadienne"]};
-export const CONTACT_EMAIL = "contact@ca-ircc-delais.example";
+export const CONTACT_EMAIL = "contact@canadaprocessingtimes.com";
 export const THEME_COLOR = '#A3122B';
 export const LOGO_SYMBOL = '⧗';
 export const BING_VERIFY_CODE = '';

@@ -3,4 +3,4 @@ Allow: /
 
 Disallow: /*?*
 
-Sitemap: https://ca-ircc-delais.example/sitemap-index.xml
+Sitemap: https://canadaprocessingtimes.com/sitemap-index.xml
