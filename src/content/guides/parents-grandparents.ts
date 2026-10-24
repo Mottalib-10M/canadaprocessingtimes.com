@@ -1,107 +1,88 @@
-import { defineGuide, type Helpers } from '../../lib/page-types';
+import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
-import type { Lang } from '../../lib/format';
 
-/* Parents et grands-parents : deux lignes prospectives (Québec, reste du Canada), leur file par mois de dépôt,
-   et le super visa comme solution de visite, délai par pays. */
-const ROC = K.readingOf('pgp-roc'), QC = K.readingOf('pgp-qc');
-const tr = K.fullTrend(ROC.series)!, tq = K.fullTrend(QC.series)!;
-const D = K.L.dates.flpt;
-const F0 = K.firstReading('flpt')!;
-const QR = ROC.queue!, QQ = QC.queue!;
-const keyAt = (q: typeof QR, back: number) => q[q.length - 1 - back][0];
-const my = (key: string, l: Lang) => K.monthYear(`${key}-15`, l);
-const leftTxt = (v: unknown, l: Lang) => (v === 'late' ? (l === 'fr' ? 'délai prévu dépassé' : 'past the expected time') : typeof v === 'number' ? `${K.num(v, l)} ${l === 'fr' ? 'mois' : v === 1 ? 'month' : 'months'}` : '');
-const lastLeft = QR[QR.length - 1][1];
-const plateau = QR.filter((x) => x[1] === lastLeft).length;
-const firstPlateau = QR.find((x) => x[1] === lastLeft)![0];
-const SV = 'super-visa';
-const svRange = K.rangeOf(SV)!;
-const svT = (c: string) => K.readingOf(SV, c).t;
-const svCodes = K.MAJOR.filter((c) => K.countriesOf(SV).includes(c) && K.isTime(svT(c))).sort((a, b) => (K.daysOf(svT(a)) ?? 0) - (K.daysOf(svT(b)) ?? 0));
-const svSer = (c: string) => `c:supervisa:${c}`;
-
-function queueRows(h: Helpers) {
-  return [0, 6, 12, 18, 24, 30].map((b) => keyAt(QR, b)).map((k) => {
-    const a = QR.find((x) => x[0] === k)!, b = QQ.find((x) => x[0] === k);
-    return [my(k, h.lang), leftTxt(a[1], h.lang), K.fmtAhead(a[2], h.lang), b ? leftTxt(b[1], h.lang) : '', b ? K.fmtAhead(b[2], h.lang) : ''];
-  });
-}
-function svRows(h: Helpers) {
-  return svCodes.map((c) => { const t = K.fullTrend(svSer(c)); return [K.COUNTRY_PAGE[c] ? h.a(K.COUNTRY_PAGE[c], h.cn(c)) : h.cn(c), h.t(svT(c)), t?.firstDate ? `${h.d(t.first!)} (${h.day(t.firstDate)})` : '']; });
-}
+/* Chiffres de la page : admissions de résidents permanents dans la catégorie des parents et grands-parents
+ * (Permanent Residents, Monthly IRCC Updates) et norme de service du super visa (Inventaire des services du GC),
+ * données ouvertes sous la Licence du gouvernement ouvert du Canada. Le délai de l'outil d'IRCC est saisi par le lecteur. */
+const E = K.en, F = K.fr;
+const M = K.PRD.months;
+const ser = K.prSeries('pgp');
+const p12 = K.pr12('pgp'), sp = K.pr12('spouse'), ch = K.pr12('child'), all = K.pr12('all');
+const yr = (y: string) => K.yearSum(ser, M, y) ?? 0;
+const y23 = yr('2023'), y24 = yr('2024'), y25 = yr('2025');
+const fall = y23 ? Math.round(((y25 - y23) / y23) * 1000) / 10 : null;
+const shareFam = K.pctOf(p12.last, (p12.last ?? 0) + (sp.last ?? 0) + (ch.last ?? 0));
+const sv = K.stdOf('super-visa')!;
+const dirEn = (x: number | null) => (x == null ? 'unchanged' : x > 0 ? 'up' : 'down');
+const dirFr = (x: number | null) => (x == null ? 'stable' : x > 0 ? 'en hausse' : 'en baisse');
 
 export default defineGuide({
   id: 'parents-grandparents', group: 'family', order: 51,
   tool: 'delai', toolArg: { g: 'pgp-roc', only: 'pgp-roc,pgp-qc' },
   related: ['super-visa', 'spousal-sponsorship', 'dependent-child', 'visitor-visa', 'beyond-processing-time'],
-  sources: ['ptimes-flpt', 'pgp', 'super-visa', 'ptimes-country', 'wayback'],
+  sources: ['ptimes', 'pgp', 'od-pr', 'od-std', 'super-visa', 'ogl'],
   en: {
     slug: 'parents-grandparents-sponsorship-processing-time',
-    nav: 'Parents and grandparents', card: 'Two times, Quebec and elsewhere, and the super visa',
-    title: 'Parents and Grandparents Sponsorship Processing Time 2026',
-    description: 'Parents and grandparents sponsorship processing time in 2026, in Quebec and the rest of Canada, the queue by month of filing, and the super visa for visits.',
-    h1: 'Sponsoring parents and grandparents: how long it takes',
-    intro: `IRCC expects ${K.fmtTime(ROC.t, 'en')} outside Quebec and ${K.fmtTime(QC.t, 'en')} in Quebec, in its file dated ${K.en.day(D)}.`,
-    resume: `Sponsoring a parent or grandparent for permanent residence currently takes ${K.fmtTime(ROC.t, 'en')} for a sponsor living outside Quebec and ${K.fmtTime(QC.t, 'en')} for a sponsor in Quebec, according to the forward-looking times IRCC published on ${K.en.day(D)}. About ${K.num(ROC.waiting ?? 0, 'en')} applications were waiting outside Quebec and ${K.num(QC.waiting ?? 0, 'en')} in Quebec. These figures are IRCC’s estimate for an application received today; they are not a promise. The outside-Quebec line has come down from a high of ${K.fmtDays(tr.max, 'm', 'en')} on ${K.en.day(tr.maxDate)}, while the Quebec line has stayed close to its peak of ${K.fmtDays(tq.max, 'm', 'en')}, reached on ${K.en.day(tq.maxDate)}. The program only accepts applications from sponsors IRCC has invited, so the line moves in steps after each intake. For a family that mostly wants to spend long periods together, the super visa is the quicker route: it is a visit document, decided in ${K.fmtTime(svT('IN'), 'en')} for India and ${K.fmtTime(svT('PH'), 'en')} for the Philippines at the latest reading, and it allows stays of up to five years at a time.`,
+    nav: 'Parents and grandparents', card: 'Decision date after an invitation, parents admitted, super visa',
+    title: 'Parents and Grandparents Program Processing Time 2026',
+    description: 'Get a decision date for a parents and grandparents sponsorship from the time IRCC shows, with the 2026 count of parents admitted and the super visa standard.',
+    h1: 'Parents and grandparents: decision date and admissions',
+    intro: `${E.n(p12.last)} parents and grandparents became permanent residents from ${E.w12(M)}, ${E.ch(p12.change)} on the twelve months before.`,
+    resume: `The Parents and Grandparents Program works by invitation: IRCC picks sponsors from those who sent an interest to sponsor form, and only invited sponsors can file. Once your complete application is received, read the time IRCC shows on its “Check processing times” tool, on the line for Quebec or for the rest of Canada, and enter it in the calculator above with the date of receipt: you get an estimated decision date, the days elapsed and the days left. The rest of this page comes from Government of Canada open data, published under the Open Government Licence of Canada. IRCC publishes no service standard for this program. Admissions are falling: ${E.n(y23)} parents and grandparents in 2023, ${E.n(y24)} in 2024 and ${E.n(y25)} in 2025, then ${E.n(p12.last)} over ${E.w12(M)}, ${E.ch(p12.change)} on the previous twelve months. They still make up ${E.pct(shareFam)} of all sponsored family admissions. For a stay without permanent residence, the super visa has a standard of ${K.fmtStd(sv.cur, 'en')}, met for ${E.pct(sv.cur.perf)} of files in ${K.fmtFy(sv.fy, 'en')}.`,
     faqs: [
-      { q: 'How long does parent sponsorship take outside Quebec in 2026?', a: `IRCC’s forward-looking time of ${K.en.day(D)} is ${K.fmtTime(ROC.t, 'en')}. In our first dated copy (${K.en.day(tr.firstDate!)}) it was ${K.fmtDays(tr.first!, 'm', 'en')}, and it rose to ${K.fmtDays(tr.max, 'm', 'en')} on ${K.en.day(tr.maxDate)} before easing. The time runs from the day IRCC receives the complete application sent after an invitation.` },
-      { q: 'Why does the parents and grandparents program take so much longer in Quebec?', a: `The Quebec government selects the sponsored parents and sets its own annual cap, and the sponsor signs an undertaking with Quebec in addition to the federal steps. The published Quebec time is ${K.fmtTime(QC.t, 'en')}, with ${K.num(QC.waiting ?? 0, 'en')} applications waiting, against ${K.fmtTime(ROC.t, 'en')} outside Quebec on ${K.en.day(D)}.` },
-      { q: 'Is a super visa a real alternative to sponsoring my parents?', a: `It answers a different need. A super visa lets a parent or grandparent visit for up to five years per entry, but gives no permanent status, no provincial health coverage and requires private medical insurance. It is decided far faster: currently between ${K.fmtTime(svRange.lo[1], 'en')} and ${K.fmtTime(svRange.hi[1], 'en')} depending on the country of filing. Many families use it while waiting for an invitation.` },
-      { q: 'Can I apply to sponsor my parents without an invitation?', a: 'No. IRCC first collects interest to sponsor forms, then invites a number of potential sponsors to apply. Only invited sponsors can submit a complete application, and the processing time on this page starts from that application. Check IRCC’s parents and grandparents page for the current intake and its dates before planning around it.' },
+      { q: 'When does the clock start for a parents and grandparents sponsorship?', a: 'On the day IRCC receives the complete application, sent after the invitation. The time spent waiting for an invitation, sometimes years, is not part of the processing time IRCC shows. Enter that receipt date in the calculator, not the date you sent the interest to sponsor form.' },
+      { q: 'Why do Quebec sponsors see a different time for parents?', a: 'A sponsor living in Quebec must also sign an undertaking with the Quebec government, which sets its own income rules and its own intake. IRCC therefore shows a separate line for Quebec on its tool. Copy the line that matches where you live, then add the date IRCC received the application.' },
+      { q: 'How fast is a super visa compared with parent sponsorship?', a: `Much faster on paper. IRCC’s service standard for a super visa is ${K.fmtStd(sv.cur, 'en')} for 80% of applications, and it was met for ${E.pct(sv.cur.perf)} of them in ${K.fmtFy(sv.fy, 'en')}. Parent sponsorship has no published standard and leads to permanent residence, which a super visa does not give.` },
+      { q: 'Are fewer parents being admitted to Canada now?', a: `Yes, according to IRCC’s open data. Admissions of parents and grandparents went from ${E.n(y23)} in 2023 to ${E.n(y25)} in 2025, ${E.ch(fall)} over two years. The latest twelve months total ${E.n(p12.last)}. The yearly levels plan sets the number of places, so lower admissions also reflect fewer places.` },
     ],
     body: (h) => `
-<h2>Two lines and their direction</h2>
-<p>IRCC publishes two times for this program: one for sponsors who live in Quebec, one for everyone else. Outside Quebec, the figure stood at ${h.d(tr.first!, 'm')} in the copy of ${h.day(tr.firstDate!)}, jumped to ${h.d(tr.max, 'm')} by ${h.day(tr.maxDate)} and has fallen at almost every reading since, to ${h.d(tr.last, 'm')} now. A jump of that size usually reflects a batch of invited applications entering the line: when thousands of files arrive in the same few months, the forward-looking time is recalculated for all of them at once.</p>
-<p>The Quebec line followed its own path. It went from ${h.d(tq.first!, 'm')} to a peak of ${h.d(tq.max, 'm')} on ${h.day(tq.maxDate)}, and is ${h.d(tq.last, 'm')} today. Quebec decides how many parents it selects each year, so a long Quebec queue reflects that cap as much as IRCC’s own pace.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'pgp-roc', m: keyAt(QR, 18) }, t: 'Your parent sponsorship: time left for your month' })}
-<h2>The queue by month of filing</h2>
-<p>For each month in which applications arrived, IRCC states how many months it expects are left and how many applications are ahead. The table shows one month in six, as of ${h.day(D)}.</p>
-${h.table(['Month filed', 'Outside Quebec: time left', 'People ahead', 'Quebec: time left', 'People ahead'], queueRows(h), `Parents and grandparents, queue published by IRCC on ${h.day(D)}.`, ['l', 'r', 'r', 'r', 'r'])}
-<p>The outside-Quebec queue has a long flat stretch: ${h.n(plateau)} months of filing, from ${h.my(`${firstPlateau}-15`)} onward, all show the same ${leftTxt(lastLeft, 'en')} left. The number of people ahead barely moves across those months. This is what an invitation-based program looks like in the data: files arrived in a block after an intake, IRCC treats them as one group, and a later month of filing does not mean a later decision within that group. Older months marked as past the expected time are files that IRCC planned to finish already, often waiting on medical results or documents.</p>
-<h2>Every reading since October 2025</h2>
-<p>Our archive of the forward-looking file starts on ${h.day(F0)}, the oldest copy we could date. The table below lists each reading for sponsors outside Quebec with the copy it comes from. No earlier point exists in our data and none has been estimated.</p>
-${h.hist(ROC.series, { max: 12, unit: 'm' })}
-<h2>The super visa: a visit, not a status</h2>
-<p>Parents and grandparents of Canadian citizens and permanent residents can ask for a ${h.a('super-visa', 'super visa')} instead, or while they wait. It allows stays of up to five years per entry and is valid for up to ten years, but it does not lead to permanent residence. The host must meet an income threshold and the visitor needs private medical insurance from an approved insurer. Unlike the sponsorship, the super visa is processed country by country, with a past time published every week.</p>
-${h.table(['Country of filing', 'Super visa time', 'Oldest copy kept'], svRows(h), `Super visa, IRCC figure of ${h.day(K.L.dates.country)}, main countries of filing.`, ['l', 'r', 'r'])}
-<p>Across all countries with a figure, the super visa currently takes from ${h.t(svRange.lo[1])} to ${h.t(svRange.hi[1])}. Even at the slow end, that is a fraction of the sponsorship line. A parent who already holds a ${h.a('visitor-visa', 'visitor visa')} can also come for shorter stays, usually up to six months at a time.</p>
-<h2>Before and after you apply</h2>
-<p>The forward-looking time starts when IRCC receives the complete application. The time between the invitation and sending the file, and any wait for police certificates or a medical exam, is not counted. If your month of filing shows a decision date that has already passed, the ${h.a('beyond-processing-time', 'steps for a file past the processing time')} apply. IRCC’s ${h.src('pgp', 'parents and grandparents page')} gives the income requirement for sponsors and the dates of the current intake.</p>
+<h2>Invitation first, then the processing time</h2>
+<p>Unlike the spouse and child streams, sponsoring a parent or grandparent starts with an intake set by IRCC. Sponsors send an interest to sponsor form during an opening, IRCC selects some of them, and invited sponsors then file the full sponsorship and permanent residence application. The processing time on IRCC’s ${h.src('ptimes', '“Check processing times” tool')} only covers what happens after that full application is received. The rules for each intake are on IRCC’s ${h.src('pgp', 'Parents and Grandparents Program page')}.</p>
+<p>So the date to enter in the calculator is the date of receipt of the complete application, which appears in the acknowledgement IRCC sends. Choose the Quebec line if you live in Quebec, the other one if not, and copy the figure with its unit. The calculator adds months as calendar months, so twenty four months from 15 March lands on 15 March two years later.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'pgp-roc', m: 'none' }, t: 'Your parents sponsorship: estimated decision date' })}
+<h2>No standard, so the tool is the only reference</h2>
+<p>The Government of Canada service inventory, published as ${h.src('od-std', 'open data')}, lists IRCC’s service standards with their yearly results. It holds none for the Parents and Grandparents Program. The only figure for a parent’s file is therefore the forward looking time IRCC shows on its tool: the time it expects for an application received now, given the files already waiting and the places planned for the year. For an application filed long ago, the figure on the tool may be shorter or longer than what your file will actually take.</p>
+<h2>Parents and grandparents admitted, by month</h2>
+<p>IRCC’s ${h.src('od-pr', 'open data on permanent residents')} counts admissions in the parents and grandparents category, which includes the spouse of the parent and children who come along. The latest twelve months total ${h.n(p12.last)}, ${dirEn(p12.change)} ${h.pa(p12.change)} on the twelve before, or ${h.pct(K.pctOf(p12.last, all.last))} of all new permanent residents of Canada.</p>
+${h.months(M, [['Parents and grandparents', ser]], { caption: 'Admissions of permanent residents in the parents and grandparents category, by month. Source: IRCC, Permanent Residents, Monthly IRCC Updates, open data; figures rounded.' })}
+<p>By calendar year, IRCC admitted ${h.n(y23)} parents and grandparents in 2023, ${h.n(y24)} in 2024 and ${h.n(y25)} in 2025, a change of ${h.ch(fall)} over two years. Admissions are the end of the process, so they show the files finished each month and the space set aside in the levels plan. They do not tell you how many new invitations were sent.</p>
+<h2>The super visa as a bridge</h2>
+<p>Many families apply for a ${h.a('super-visa', 'super visa')} while waiting, or instead of sponsorship. It is a temporary resident visa that lets a parent or grandparent stay in Canada for up to five years per entry, with private medical insurance and a minimum income from the child or grandchild. IRCC’s ${h.src('super-visa', 'super visa page')} lists the conditions. Its service standard is ${K.fmtStd(sv.cur, 'en')} for 80% of applications; in ${K.fmtFy(sv.fy, 'en')}, ${h.n(sv.cur.met)} of ${h.n(sv.cur.total)} were processed within it, ${h.pct(sv.cur.perf)}.</p>
+<p>A super visa does not lead to permanent residence and gives no access to provincial health care. A parent can hold one while a sponsorship is in process, and a pending sponsorship is not a reason to refuse it. For a short trip, the ordinary ${h.a('visitor-visa', 'visitor visa')} is enough.</p>
+<h2>If the file runs long</h2>
+<p>Parents are often older, and medical exams expire after twelve months. If IRCC asks for a new exam, the file waits until it is done. When the calculator shows the date has passed and your account shows no request, the ${h.a('beyond-processing-time', 'guide to files past the processing time')} sets out what to do. Spouses and children have their own pages: ${h.a('spousal-sponsorship', 'spousal sponsorship')} and ${h.a('dependent-child', 'dependent child')}.</p>
 `,
   },
   fr: {
     slug: 'delai-parrainage-parents-grands-parents',
-    nav: 'Parents et grands-parents', card: 'Deux délais, Québec et ailleurs, et le super visa',
+    nav: 'Parents et grands-parents', card: 'Date de décision après invitation, parents admis, super visa',
     title: 'Délai du parrainage des parents et grands-parents 2026',
-    description: 'Délai du parrainage des parents et grands-parents en 2026, au Québec et ailleurs au Canada : file par mois de dépôt, tendance et super visa pour venir vite.',
-    h1: 'Parrainer ses parents ou grands-parents : les délais',
-    intro: `IRCC prévoit ${K.fmtTime(QC.t, 'fr')} au Québec et ${K.fmtTime(ROC.t, 'fr')} ailleurs au Canada, dans son fichier daté du ${K.fr.day(D)}.`,
-    resume: `Parrainer un parent ou un grand-parent pour la résidence permanente prend aujourd’hui ${K.fmtTime(QC.t, 'fr')} pour un répondant qui vit au Québec et ${K.fmtTime(ROC.t, 'fr')} pour un répondant ailleurs au Canada, selon les délais prospectifs publiés par IRCC le ${K.fr.day(D)}. Environ ${K.num(QC.waiting ?? 0, 'fr')} demandes attendaient côté Québec et ${K.num(ROC.waiting ?? 0, 'fr')} dans le reste du pays. Ces chiffres sont l’estimation d’IRCC pour une demande reçue aujourd’hui, pas un engagement. La ligne du Québec a culminé à ${K.fmtDays(tq.max, 'm', 'fr')} le ${K.fr.day(tq.maxDate)} et n’en est redescendue que de peu, alors que celle du reste du Canada a reculé depuis son sommet de ${K.fmtDays(tr.max, 'm', 'fr')}. Seuls les répondants invités par IRCC peuvent déposer, et le Québec fixe en plus son propre plafond de sélection. Pour passer de longues périodes en famille sans attendre, le super visa est beaucoup plus rapide : c’est un document de visite, accordé en ${K.fmtTime(svT('MA'), 'fr')} depuis le Maroc et en ${K.fmtTime(svT('DZ'), 'fr')} depuis l’Algérie au dernier relevé, pour des séjours allant jusqu’à cinq ans d’affilée.`,
+    description: 'Obtenez une date de décision pour le parrainage d’un parent ou grand-parent à partir du délai d’IRCC, avec les parents admis en 2026 et la norme du super visa.',
+    h1: 'Parents et grands-parents : date de décision et admissions',
+    intro: `${F.n(p12.last)} parents et grands-parents sont devenus résidents permanents de ${F.w12(M)}, soit ${F.ch(p12.change)} sur un an.`,
+    resume: `Le Programme des parents et des grands-parents fonctionne sur invitation : IRCC tire des répondants parmi ceux qui ont envoyé un formulaire d’intérêt, et seuls les répondants invités peuvent déposer une demande. Une fois votre demande complète reçue, lisez le délai affiché par l’outil « Vérifier les délais de traitement » d’IRCC, sur la ligne du Québec ou du reste du Canada, et saisissez-le dans le calculateur ci-dessus avec la date de réception : vous obtenez une date de décision estimée, les jours écoulés et ceux qui restent. Le reste de la page vient des données ouvertes du gouvernement du Canada, publiées sous la Licence du gouvernement ouvert du Canada. IRCC ne publie aucune norme de service pour ce programme. Les admissions reculent : ${F.n(y23)} parents et grands-parents en 2023, ${F.n(y24)} en 2024 et ${F.n(y25)} en 2025, puis ${F.n(p12.last)} de ${F.w12(M)}, soit ${F.ch(p12.change)} sur un an. Ils représentent encore ${F.pct(shareFam)} des admissions de la famille parrainée. Pour un séjour sans résidence permanente, le super visa a une norme de ${K.fmtStd(sv.cur, 'fr')}, tenue pour ${F.pct(sv.cur.perf)} des dossiers en ${K.fmtFy(sv.fy, 'fr')}.`,
     faqs: [
-      { q: 'Combien de temps prend le parrainage des parents au Québec en 2026 ?', a: `Le délai prospectif publié par IRCC le ${K.fr.day(D)} est de ${K.fmtTime(QC.t, 'fr')}, avec ${K.num(QC.waiting ?? 0, 'fr')} demandes en attente. Il était de ${K.fmtDays(tq.first!, 'm', 'fr')} dans notre première copie datée, du ${K.fr.day(tq.firstDate!)}. Le délai court à partir de la réception de la demande complète envoyée après l’invitation.` },
-      { q: 'Pourquoi le parrainage des parents est-il plus long au Québec qu’ailleurs ?', a: `Le Québec sélectionne lui-même les parents parrainés et fixe un nombre maximal de demandes par année. Le répondant signe un engagement auprès du gouvernement du Québec, en plus des étapes fédérales. Au ${K.fr.day(D)}, cela donne ${K.fmtTime(QC.t, 'fr')} au Québec contre ${K.fmtTime(ROC.t, 'fr')} dans le reste du Canada.` },
-      { q: 'Le super visa peut-il remplacer le parrainage de mes parents ?', a: `Il répond à un autre besoin. Le super visa permet des séjours de cinq ans au plus par entrée, sans statut permanent ni couverture de l’assurance maladie provinciale, et exige une assurance médicale privée. Il est tranché bien plus vite : entre ${K.fmtTime(svRange.lo[1], 'fr')} et ${K.fmtTime(svRange.hi[1], 'fr')} selon le pays de dépôt au dernier relevé.` },
-      { q: 'Peut-on parrainer ses parents sans avoir reçu d’invitation ?', a: 'Non. IRCC recueille d’abord des formulaires d’intérêt, puis invite un certain nombre de répondants potentiels à présenter une demande. Seuls les répondants invités peuvent envoyer une demande complète, et le délai de cette page part de cette demande. La page d’IRCC sur les parents et grands-parents donne les dates de la période d’invitation en cours.' },
+      { q: 'Quand le délai du parrainage des parents commence-t-il ?', a: 'Le jour où IRCC reçoit la demande complète, envoyée après l’invitation. L’attente de l’invitation, parfois plusieurs années, ne fait pas partie du délai affiché par IRCC. Saisissez donc dans le calculateur cette date de réception, et non la date d’envoi du formulaire d’intérêt à parrainer.' },
+      { q: 'Pourquoi le délai des parents diffère-t-il pour les répondants du Québec ?', a: 'Un répondant qui vit au Québec doit aussi signer un engagement auprès du gouvernement du Québec, qui fixe ses propres règles de revenu et son propre nombre de demandes. IRCC affiche donc une ligne distincte pour le Québec. Recopiez la ligne qui correspond à votre lieu de vie, puis la date de réception de la demande.' },
+      { q: 'Le super visa est-il plus rapide que le parrainage d’un parent ?', a: `Nettement, sur le papier. La norme de service d’IRCC pour le super visa est de ${K.fmtStd(sv.cur, 'fr')} pour 80 % des demandes, et elle a été tenue pour ${F.pct(sv.cur.perf)} d’entre elles en ${K.fmtFy(sv.fy, 'fr')}. Le parrainage d’un parent n’a pas de norme publiée, mais il mène à la résidence permanente, ce que le super visa ne donne pas.` },
+      { q: 'Le Canada admet-il moins de parents qu’avant ?', a: `Oui, selon les données ouvertes d’IRCC. Les admissions de parents et grands-parents sont passées de ${F.n(y23)} en 2023 à ${F.n(y25)} en 2025, soit ${F.ch(fall)} en deux ans. Les douze derniers mois en totalisent ${F.n(p12.last)}. Le plan des niveaux fixe le nombre de places : la baisse des admissions reflète aussi moins de places.` },
     ],
     body: (h) => `
-<h2>Deux lignes, deux trajectoires</h2>
-<p>IRCC publie un délai pour les répondants du Québec et un autre pour le reste du Canada. Au Québec, le chiffre était de ${h.d(tq.first!, 'm')} dans la copie du ${h.day(tq.firstDate!)}. Il a grimpé jusqu’à ${h.d(tq.max, 'm')} le ${h.day(tq.maxDate)} puis n’a reculé que lentement, à ${h.d(tq.last, 'm')} aujourd’hui. Comme le Québec plafonne le nombre de parents sélectionnés chaque année, une longue file québécoise traduit ce plafond autant que le rythme d’IRCC.</p>
-<p>Hors Québec, la courbe est plus nerveuse. Elle est passée de ${h.d(tr.first!, 'm')} à ${h.d(tr.max, 'm')} en un mois, le ${h.day(tr.maxDate)}, un saut qui traduit en général l’arrivée d’un lot de demandes invitées, puis elle a baissé presque à chaque relevé jusqu’à ${h.d(tr.last, 'm')}.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'pgp-qc', m: keyAt(QQ, 18) }, t: 'Votre parrainage de parent : temps restant pour votre mois' })}
-<h2>La file selon le mois de dépôt</h2>
-<p>Pour chaque mois de réception, IRCC indique le nombre de mois qu’il prévoit encore et le nombre de demandes placées devant. Le tableau reprend un mois sur six, au ${h.day(D)}.</p>
-${h.table(['Mois de dépôt', 'Hors Québec : temps restant', 'Personnes devant', 'Québec : temps restant', 'Personnes devant'], queueRows(h), `Parents et grands-parents, file publiée par IRCC le ${h.day(D)}.`, ['l', 'r', 'r', 'r', 'r'])}
-<p>La file du Québec affiche des temps restants très longs même pour des dossiers déposés il y a plus de deux ans : pour ${h.my(`${keyAt(QQ, 24)}-15`)}, IRCC prévoit encore ${leftTxt(QQ[QQ.length - 25][1], 'fr')}. Hors Québec, ${h.n(plateau)} mois de dépôt consécutifs, depuis ${h.my(`${firstPlateau}-15`)}, partagent le même temps restant : les demandes arrivées après une même période d’invitation sont traitées comme un bloc, et un mois de dépôt plus tardif ne signifie pas une décision plus tardive au sein de ce bloc.</p>
-<h2>Tous les relevés depuis octobre 2025</h2>
-<p>Notre archive du fichier prospectif commence le ${h.day(F0)}, date de la plus ancienne copie que nous avons pu dater. Voici chaque relevé de la ligne du Québec, avec la copie d’où il vient. Aucun point plus ancien n’existe dans nos données et aucun n’est estimé.</p>
-${h.hist(QC.series, { max: 12, unit: 'm' })}
-<h2>Le super visa : une visite, pas un statut</h2>
-<p>Les parents et grands-parents de citoyens canadiens et de résidents permanents peuvent demander un ${h.a('super-visa', 'super visa')}, à la place du parrainage ou en l’attendant. Il autorise des séjours jusqu’à cinq ans par entrée et reste valide jusqu’à dix ans, sans mener à la résidence permanente. L’hôte doit atteindre un seuil de revenu et le visiteur doit souscrire une assurance médicale privée. Le délai du super visa est publié chaque semaine, pays par pays.</p>
-${h.table(['Pays de dépôt', 'Délai du super visa', 'Plus ancienne copie'], svRows(h), `Super visa, chiffre d’IRCC du ${h.day(K.L.dates.country)}, principaux pays de dépôt.`, ['l', 'r', 'r'])}
-<p>Selon le pays, il faut aujourd’hui de ${h.t(svRange.lo[1])} à ${h.t(svRange.hi[1])}. Même au plus long, c’est une petite partie du délai du parrainage, et la demande peut être faite dès que l’hôte remplit les conditions, sans attendre aucune invitation. Beaucoup de familles combinent les deux : le parent vient avec un super visa pendant que le dossier de résidence permanente avance dans la file. Un parent qui a déjà un ${h.a('visitor-visa', 'visa de visiteur')} peut aussi venir pour des séjours plus courts, en général six mois au plus.</p>
-<h2>Avant et après le dépôt</h2>
-<p>Le délai prospectif part de la réception de la demande complète. Le temps entre l’invitation et l’envoi du dossier, et l’attente des certificats de police ou de l’examen médical, ne sont pas comptés. Si la date prévue pour votre mois de dépôt est déjà passée, voyez les ${h.a('beyond-processing-time', 'démarches pour une demande hors délai')}. La ${h.src('pgp', 'page d’IRCC sur le parrainage des parents et grands-parents')} donne le revenu exigé du répondant et le calendrier de la période d’invitation.</p>
+<h2>D’abord l’invitation, ensuite le délai</h2>
+<p>Contrairement aux volets de l’époux et de l’enfant, le parrainage d’un parent ou d’un grand-parent commence par une période de réception fixée par IRCC. Les répondants envoient un formulaire d’intérêt pendant une ouverture, IRCC en sélectionne une partie, puis les répondants invités déposent la demande complète de parrainage et de résidence permanente. Le délai de l’${h.src('ptimes', 'outil « Vérifier les délais de traitement »')} ne couvre que ce qui suit la réception de cette demande complète. Les règles de chaque période figurent sur la ${h.src('pgp', 'page d’IRCC du Programme des parents et des grands-parents')}.</p>
+<p>La date à saisir dans le calculateur est donc celle de la réception de la demande complète, indiquée dans l’accusé de réception d’IRCC. Choisissez la ligne du Québec si vous y vivez, l’autre sinon, et recopiez le chiffre avec son unité. Le calculateur ajoute les mois en mois de calendrier : vingt-quatre mois à partir du 15 mars mènent au 15 mars deux ans plus tard.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'pgp-qc', m: 'none' }, t: 'Votre parrainage de parents : date de décision estimée' })}
+<h2>Pas de norme : l’outil reste la seule référence</h2>
+<p>L’inventaire des services du gouvernement du Canada, publié en ${h.src('od-std', 'données ouvertes')}, recense les normes de service d’IRCC avec leurs résultats annuels. Il n’en contient aucune pour le Programme des parents et des grands-parents. Le seul chiffre pour le dossier d’un parent est donc le délai prospectif affiché par l’outil d’IRCC : le temps prévu pour une demande reçue maintenant, selon les dossiers déjà en attente et les places prévues pour l’année. Pour une demande ancienne, ce chiffre peut être plus court ou plus long que le temps réel de votre dossier.</p>
+<h2>Les parents et grands-parents admis, par mois</h2>
+<p>Les ${h.src('od-pr', 'données ouvertes d’IRCC sur les résidents permanents')} comptent les admissions dans la catégorie des parents et grands-parents, qui inclut l’époux du parent et les enfants qui l’accompagnent. Les douze derniers mois en totalisent ${h.n(p12.last)}, ${dirFr(p12.change)} de ${h.pa(p12.change)} sur les douze précédents, soit ${h.pct(K.pctOf(p12.last, all.last))} de tous les nouveaux résidents permanents du Canada.</p>
+${h.months(M, [['Parents et grands-parents', ser]], { caption: 'Admissions de résidents permanents dans la catégorie des parents et grands-parents, par mois. Source : IRCC, Résidents permanents, mises à jour mensuelles, données ouvertes ; chiffres arrondis.' })}
+<p>Par année civile, IRCC a admis ${h.n(y23)} parents et grands-parents en 2023, ${h.n(y24)} en 2024 et ${h.n(y25)} en 2025, une évolution de ${h.ch(fall)} en deux ans. Les admissions sont la fin du parcours : elles montrent les dossiers terminés chaque mois et la place réservée dans le plan des niveaux. Elles ne disent pas combien de nouvelles invitations ont été envoyées.</p>
+<h2>Le super visa comme passerelle</h2>
+<p>Beaucoup de familles demandent un ${h.a('super-visa', 'super visa')} pendant l’attente, ou à la place du parrainage. C’est un visa de résident temporaire qui permet à un parent ou grand-parent de rester au Canada jusqu’à cinq ans par entrée, avec une assurance médicale privée et un revenu minimum de l’enfant ou du petit-enfant. La ${h.src('super-visa', 'page d’IRCC sur le super visa')} en donne les conditions. Sa norme de service est de ${K.fmtStd(sv.cur, 'fr')} pour 80 % des demandes ; en ${K.fmtFy(sv.fy, 'fr')}, ${h.n(sv.cur.met)} demandes sur ${h.n(sv.cur.total)} ont été traitées dans ce délai, soit ${h.pct(sv.cur.perf)}.</p>
+<p>Le super visa ne mène pas à la résidence permanente et n’ouvre pas l’accès à l’assurance maladie provinciale. Un parent peut le détenir pendant le traitement d’un parrainage, et un parrainage en cours n’est pas un motif de refus. Pour un court voyage, le ${h.a('visitor-visa', 'visa de visiteur')} ordinaire suffit.</p>
+<h2>Si le dossier s’allonge</h2>
+<p>Les parents sont souvent plus âgés, et l’examen médical expire au bout de douze mois. Si IRCC demande un nouvel examen, le dossier attend qu’il soit fait. Quand le calculateur indique que la date est dépassée et que votre compte ne montre aucune demande, le ${h.a('beyond-processing-time', 'guide des dossiers qui dépassent le délai')} explique quoi faire. Époux et enfants ont leurs propres pages : ${h.a('spousal-sponsorship', 'parrainage de l’époux')} et ${h.a('dependent-child', 'enfant à charge')}.</p>
 `,
   },
 });

@@ -11,12 +11,11 @@ const description = 'Écrire à l’éditeur de Délais de traitement Canada au 
 <PageLayout title="Contact Délais de traitement Canada 2026 : corrections" description={description} lang={lang} noindex={true} jsonLd={[contactPageSchema({ name: 'Contact', description, path, lang })]} breadcrumbs={[{ label: 'Contact' }]} showAuthor={false}>
   <div class="prose prose-slate max-w-none">
     <h1>Contact</h1>
-    <p>Écrivez à <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Pas de formulaire, pas de téléphone, pas de compte : une adresse, lue par les personnes qui tiennent l’archive et les calculateurs à jour.</p>
+    <p>Écrivez à <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. Pas de formulaire, pas de téléphone, pas de compte : une adresse, lue par les personnes qui tiennent les données et les calculateurs à jour.</p>
     <h2>Les messages utiles</h2>
     <ul>
-      <li>Un délai ou une date qui diffère de ce qu’affiche l’outil d’IRCC : indiquez le type de demande, le pays et le jour de votre consultation.</li>
-      <li>Une ligne d’IRCC que le site ne suit pas encore.</li>
-      <li>Une ancienne copie des fichiers d’IRCC, avec sa date, qui comblerait un trou de l’archive.</li>
+      <li>Un chiffre qui diffère des données ouvertes d’IRCC ou une date que le calculateur calcule mal : indiquez la page, le type de demande et les valeurs saisies.</li>
+      <li>Un jeu de données ouvertes d’IRCC que le site n’utilise pas encore.</li>
       <li>Intégrer le calculateur sur un site associatif ou étudiant : le code est sur la <a href={route('widget', lang)}>page d’intégration</a>.</li>
     </ul>
     <h2>Ce que nous ne pouvons pas faire</h2>

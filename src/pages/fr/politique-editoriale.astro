@@ -4,18 +4,18 @@ import { route } from '../../i18n/routes';
 import { AUTHOR_NAME } from '../../data/site-config';
 const lang = 'fr';
 ---
-<PageLayout title="Politique éditoriale de Délais de traitement Canada 2026" description="Comment Délais de traitement Canada écrit ses pages 2026 : fichiers publiés par IRCC seulement, chiffres lus par un script et datés, estimations nommées, aucun argent des consultants." lang={lang} noindex={true} breadcrumbs={[{ label: 'Politique éditoriale' }]} showAuthor={false}>
+<PageLayout title="Politique éditoriale de Délais de traitement Canada 2026" description="Comment Délais de traitement Canada écrit ses pages 2026 : données ouvertes du Canada seulement, chiffres lus par un script et datés, estimations nommées." lang={lang} noindex={true} breadcrumbs={[{ label: 'Politique éditoriale' }]} showAuthor={false}>
   <div class="prose prose-slate max-w-none">
     <h1>Politique éditoriale</h1>
     <h2>Ce qui compte comme source</h2>
-    <p>Les fichiers et pages publiés par IRCC sur canada.ca, la Loi sur la citoyenneté sur le site de la législation (Justice), et les copies des fichiers d’IRCC conservées par l’Internet Archive, citées avec leur date de capture. Un article, un forum ou un autre site peut nous signaler un changement ; nous ne le publions qu’après avoir lu le chiffre d’IRCC. Les délais signalés par des demandeurs ne sont pas utilisés.</p>
+    <p>Les jeux de données publiés sur le portail de données ouvertes du gouvernement du Canada sous la Licence du gouvernement ouvert du Canada, les pages de programme d’IRCC sur canada.ca pour les règles (en lien, sans reproduction), et la Loi sur la citoyenneté sur le site de la législation (Justice). Un article, un forum ou un autre site peut nous signaler un changement ; nous ne le publions qu’après avoir lu le chiffre officiel. Les délais signalés par des demandeurs ne sont pas utilisés, et les délais du moment d’IRCC ne sont pas recopiés : le lecteur saisit le délai lu dans l’outil d’IRCC.</p>
     <h2>Comment un chiffre arrive sur une page</h2>
-    <p>Un script lit chaque fichier d’IRCC, garde la date de mise à jour inscrite par IRCC et la date de lecture, et ajoute le relevé à l’archive. Les pages et les calculateurs lisent ces fichiers ; personne ne tape un délai dans une page. Si un fichier ne se lit pas, le précédent est gardé et les pages affichent la date IRCC réellement lue.</p>
+    <p>Un script lit chaque fichier de données ouvertes, garde la date des données et la date de lecture, et écrit les valeurs qu’utilisent les pages. Les pages et les calculateurs lisent ces valeurs ; personne ne tape un chiffre dans une page. Si un fichier ne se lit pas, les valeurs précédentes sont gardées et les pages affichent la date réellement lue.</p>
     <h2>Estimations</h2>
-    <p>Une date de décision est toujours appelée estimation, avec sa méthode en lien. Rien n’est interpolé dans l’archive : une semaine sans copie du fichier d’IRCC n’a pas de chiffre.</p>
+    <p>Une date de décision est toujours appelée estimation, avec sa méthode en lien. Les mois qu’IRCC masque dans ses fichiers restent vides : rien n’est complété ni interpolé.</p>
     <h2>Indépendance</h2>
-    <p>{AUTHOR_NAME} ne reçoit rien des consultants, cabinets d’avocats, écoles, recruteurs ni d’aucune entreprise au service des demandeurs, et les pages ne portent aucun lien d’affiliation. Le site n’a aucun lien avec IRCC ni avec un organisme public et ne se présente jamais comme tel.</p>
+    <p>{AUTHOR_NAME} ne reçoit rien des consultants, cabinets d’avocats, écoles, recruteurs ni d’aucune entreprise au service des demandeurs, et les pages ne portent aucun lien d’affiliation. Le site n’est ni affilié à IRCC ou à un organisme public ni approuvé par eux, et ne se présente jamais comme tel.</p>
     <h2>Corrections</h2>
-    <p>Une erreur signalée est vérifiée sur le fichier d’IRCC ; si nous nous sommes trompés, la page est corrigée le jour même. Écrivez par la <a href={route('contact', lang)}>page de contact</a>.</p>
+    <p>Une erreur signalée est vérifiée sur les données officielles ; si nous nous sommes trompés, la page est corrigée le jour même. Écrivez par la <a href={route('contact', lang)}>page de contact</a>.</p>
   </div>
 </PageLayout>

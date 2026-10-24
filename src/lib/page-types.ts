@@ -21,13 +21,15 @@ export interface Helpers extends Kit {
   box: (title: string, html: string) => string;
   /** Mini-simulateur bâti sur un calculateur de tool-specs.ts. */
   mini: (kind: string, opts?: MiniOpts) => string;
-  /** Formats de la langue de la page : nombre, date, mois et année, délai publié, jours dans une unité. */
-  n: (x: number, d?: number) => string; day: (iso: string) => string; my: (iso: string) => string;
-  t: (t: import('./data').Reading['t']) => string; d: (days: number, u?: string) => string;
+  /** Formats de la langue de la page : nombre, pour cent, écart en %, date, mois et année (« 2026-08 » accepté),
+   *  fenêtre de douze mois (« septembre 2025 à août 2026 »). */
+  n: (x: number | null | undefined, d?: number) => string; pct: (x: number | null | undefined) => string; ch: (x: number | null | undefined) => string; pa: (x: number | null | undefined) => string;
+  day: (iso: string) => string; my: (iso: string) => string; w12: (months?: string[], back?: number) => string;
   /** Nom d'un pays dans la langue. */
   cn: (code: string) => string;
-  /** Tableau des relevés datés d'une série (historique complet), chaque ligne avec sa provenance citée. */
-  hist: (series: string, opts?: { max?: number; unit?: string; caption?: string }) => string;
+  /** Tableau mensuel d'une ou plusieurs séries de données ouvertes : months = K.MONTHS (ou K.PRD.months…),
+   *  cols = [[en-tête, série]]. Les 12 derniers mois par défaut. */
+  months: (months: string[], cols: Array<[string, Array<number | null>]>, opts?: { max?: number; caption?: string }) => string;
 }
 
 export type Group = 'visit' | 'study' | 'work' | 'pr' | 'family' | 'cit' | 'tools' | 'countries';

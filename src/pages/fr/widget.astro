@@ -6,10 +6,10 @@ import { breadcrumbSchema } from '../../lib/seo';
 const lang = 'fr';
 const code = `<iframe src="${SITE_URL}/embed/delais-traitement/" title="Délais de traitement d’IRCC et date de décision estimée" width="100%" height="900" style="border:0;max-width:900px" loading="lazy"></iframe>`;
 ---
-<PageLayout title="Intégrer le calculateur des délais d’IRCC sur votre site, 2026" description="Associations étudiantes, organismes communautaires et blogues peuvent intégrer le calculateur 2026 des délais d’IRCC, date de décision et tendance comprises, en une ligne. Gratuit, sans cookie." lang={lang} noindex={true} jsonLd={[breadcrumbSchema([{ name: 'Accueil', path: route('home', lang) }, { name: 'Intégrer le calculateur', path: route('widget', lang) }])]} breadcrumbs={[{ label: 'Intégrer le calculateur' }]} showAuthor={false}>
+<PageLayout title="Intégrer le calculateur des délais d’IRCC sur votre site, 2026" description="Associations étudiantes, organismes communautaires et blogues peuvent intégrer le calculateur 2026 des délais d’IRCC, avec la date de décision estimée et la norme de service, en une ligne. Gratuit." lang={lang} noindex={true} jsonLd={[breadcrumbSchema([{ name: 'Accueil', path: route('home', lang) }, { name: 'Intégrer le calculateur', path: route('widget', lang) }])]} breadcrumbs={[{ label: 'Intégrer le calculateur' }]} showAuthor={false}>
   <header class="mb-6">
     <h1 class="text-3xl font-bold text-navy-900 md:text-4xl">Intégrer le calculateur</h1>
-    <p class="mt-3 text-lg text-navy-700">Une ligne de code. Le calculateur intégré suit chaque mise à jour des fichiers d’IRCC.</p>
+    <p class="mt-3 text-lg text-navy-700">Une ligne de code. Le calculateur intégré suit chaque mise à jour des données ouvertes d’IRCC.</p>
   </header>
   <div class="prose prose-slate max-w-none">
     <pre class="overflow-x-auto rounded-lg bg-navy-900 p-4 text-sm text-white"><code>{code}</code></pre>

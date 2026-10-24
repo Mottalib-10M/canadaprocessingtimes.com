@@ -1,72 +1,55 @@
-import { defineGuide, type Helpers } from '../../lib/page-types';
+import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
+import { dir, ord, rank, studyYear } from './_pays-en';
 
-/* Philippines: every figure read from IRCC's country file and our dated archive at build time. */
+/* Philippines: the permanent side first (PR authorizations, new citizens, caregivers), then temporary files.
+ * Every figure comes from IRCC open data (OGL-Canada 2.0), by country of citizenship (of birth for new citizens). */
 const C = 'PH';
-const D = K.L.dates.country;
 const E = K.en;
-const R = K.HIST.readings.country;
-const SER: Record<string, string> = { visitor: `c:visitor-outside-canada:${C}`, 'super-visa': `c:supervisa:${C}`, study: `c:study:${C}`, work: `c:work:${C}`, child: `c:child_dependent:${C}` };
-const t = (g: string, c = C) => K.readingOf(g, c).t;
-const unit = (g: string) => { const x = t(g); return x && 'u' in x ? x.u : 'd'; };
-const known = (g: string) => K.countriesOf(g).map((x) => K.daysOf(t(g, x))).filter((v): v is number => v != null).sort((a, b) => a - b);
-function rank(g: string): string {
-  const all = known(g), mine = K.daysOf(t(g));
-  if (mine == null) return 'not ranked';
-  const pos = all.filter((v) => v < mine).length + 1, tie = all.filter((v) => v === mine).length > 1;
-  const o = pos % 100 >= 11 && pos % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[pos % 10] ?? 'th';
-  return `${tie ? 'tied ' : 'the '}${pos === 1 ? '' : `${pos}${o} `}fastest of ${E.n(all.length)}`;
-}
-const mid = (g: string) => { const a = known(g); return a[Math.floor(a.length / 2)]; };
-const at = (s: string, d: string) => K.points(s).find((p) => p.date === d)?.v;
-const move = (tr: { dir?: string }) => (tr.dir === 'up' ? 'up from' : tr.dir === 'down' ? 'down from' : 'close to');
-const wk = K.fullTrend(SER.work)!, vi = K.fullTrend(SER.visitor)!, sv = K.fullTrend(SER['super-visa'])!, ch = K.fullTrend(SER.child)!, sd = K.fullTrend(SER.study)!;
-const wIn = K.readingOf('work-inside'), wInT = K.fullTrend(wIn.series)!;
-const wExt = K.readingOf('work-ext'), wExtAlt = K.altOf('work-ext')!;
-const cg = K.readingOf('caregiver');
-const others = ['HK', 'SG', 'AE'].filter((c) => K.daysOf(t('work', c)) != null);
-
-function family(h: Helpers) {
-  return (['visitor', 'super-visa', 'child', 'study'] as const).map((g) => {
-    const tr = K.fullTrend(SER[g]);
-    return [h.a(K.PAGE_OF[g], K.progName(g, 'en')), h.t(t(g)), rank(g), tr?.prev != null ? `${h.d(tr.prev, unit(g))} (${h.day(tr.prevDate!)})` : ''];
-  });
-}
+const copr = K.ops12('copr', C), prIn = K.ops12('prIn', C), cit = K.ops12('cit', C);
+const fin = K.ops12('trFin', C), ok = K.approval12(C), nt = K.net12(C);
+const v1 = K.ops12('v1', C), sp = K.study12(C);
+const care = K.pr12('caregiver');
+const rCopr = rank('copr', C), rCit = rank('cit', C), rFin = rank('trFin', C);
+const c23 = K.fullYear('copr', C, '2023')!, c24 = K.fullYear('copr', C, '2024')!, c25 = K.fullYear('copr', C, '2025')!;
+const s23 = studyYear(C, '2023')!, s25 = studyYear(C, '2025')!;
+const ee = K.eeCountry(K.EE_FULL, C);
+const stdW = K.stdOf('work-inside')!;
+if (rCopr == null || rCopr > 5) throw new Error('philippines : le texte suppose les Philippines parmi les 5 premiers pays de la résidence permanente');
 
 export default defineGuide({
   id: 'philippines', group: 'countries', order: 101, country: C,
-  tool: 'delai', toolArg: { g: 'visitor', c: C, only: 'visitor,super-visa,study,work,child' },
+  tool: 'pays', toolArg: { c: C },
   related: ['work-permit', 'caregiver', 'work-permit-extension', 'pgwp', 'super-visa', 'dependent-child'],
-  sources: ['ptimes-country', 'work-permit', 'caregivers', 'ptimes-flpt', 'biometrics', 'wayback'],
+  sources: ['open-data', 'od-pr', 'od-std', 'od-study', 'ptimes', 'caregivers', 'ogl'],
   en: {
     slug: 'processing-times-philippines',
-    nav: 'Philippines', card: 'Work permits, caregivers and family lines from the Philippines',
-    title: 'Work Permit and Visa Processing Times, Philippines 2026',
-    description: 'Canadian work permit, caregiver, visitor visa, super visa and child sponsorship times for applicants in the Philippines in 2026, from the latest IRCC files.',
-    h1: 'Processing times for applications filed from the Philippines',
-    intro: `On ${E.day(D)} IRCC published ${K.fmtTime(t('work'), 'en')} for a work permit requested from the Philippines, ${move(wk)} ${E.d(wk.prev!, 'w')} at the reading before.`,
-    resume: `A work permit requested from the Philippines currently takes ${K.fmtTime(t('work'), 'en')}, according to IRCC’s country file of ${E.day(D)}, which ranks the Philippines ${rank('work')} countries with a published work permit figure; the middle value across them is ${E.d(mid('work'), 'w')}. Our oldest dated copy, from ${E.day(wk.firstDate!)}, showed ${E.d(wk.first!, 'w')}, and the lowest point we hold is ${E.d(wk.min, 'w')} on ${E.day(wk.minDate)}. Caregivers who seek permanent residence fall under a separate line that IRCC does not split by country: for an application received today it expects ${K.fmtTime(cg.t, 'en')}, read on ${E.day(cg.date)}. From the Philippines, a visitor visa now takes ${K.fmtTime(t('visitor'), 'en')}, a super visa ${K.fmtTime(t('super-visa'), 'en')}, a study permit ${K.fmtTime(t('study'), 'en')} and dependent child sponsorship ${K.fmtTime(t('child'), 'en')}. Country figures are past times: the period within which IRCC finished 80% of recent files, counted from receipt of a complete application and without the biometrics appointment. The tool above adds any of them to your filing date.`,
+    nav: 'Philippines', card: 'Permanent residence, new citizens and caregivers from the Philippines',
+    title: 'Permanent Residence and Permits for Filipinos, 2026 Data',
+    description: 'Filipinos rank near the top for Canadian permanent residence and new citizens: 2026 volumes, temporary files and caregiver admissions, from IRCC open data.',
+    h1: 'Filipino citizens and Canada: a line that ends in permanent residence',
+    intro: `IRCC issued ${E.n(copr.last)} permanent residence authorizations to Filipino citizens from ${E.w12()}, the ${ord(rCopr)} highest of any country.`,
+    resume: `For Filipino citizens, the Canadian story leans toward settling for good. From ${E.w12()}, IRCC issued ${E.n(copr.last)} confirmations or visas of permanent residence to citizens of the Philippines, which places the country ${ord(rCopr)} among all countries of citizenship, and ${E.n(cit.last)} people born in the Philippines became Canadian citizens, ${ord(rCit)} by country of birth. Calendar years show the scale: ${E.n(c23)} permanent residence authorizations in 2023, ${E.n(c24)} in 2024 and ${E.n(c25)} in 2025. On the temporary side, IRCC finalized ${E.n(fin.last)} applications from Filipino citizens over the same twelve months, and ${E.pct(ok.rate)} ended in an approval. Caregivers, a pathway long used by Filipino workers, accounted for ${E.n(care.last)} new permanent residents across all nationalities. None of these counts is a processing time: copy the figure IRCC shows for your application and the calculator turns it into a date.`,
     faqs: [
-      { q: 'How long does a Canadian work permit take from the Philippines right now?', a: `IRCC’s figure of ${E.day(D)} is ${K.fmtTime(t('work'), 'en')}, ${move(wk)} ${E.d(wk.prev!, 'w')} on ${E.day(wk.prevDate!)}. It counts from the day IRCC receives the complete application. An employer’s labour market impact assessment, when the job needs one, is a separate step handled before the permit application and is not part of this time.` },
-      { q: 'Is there a caregiver processing time specific to the Philippines?', a: `No. IRCC publishes one permanent residence line for caregivers for all countries. On ${E.day(cg.date)} it expected ${K.fmtTime(cg.t, 'en')} for an application received that day, with ${K.fmtAhead(cg.waiting ?? 0, 'en')} people waiting. A work permit requested from the Philippines follows the country line instead, currently ${K.fmtTime(t('work'), 'en')}.` },
-      { q: 'Which is faster from the Philippines, a super visa or a visitor visa?', a: `The visitor visa, by a wide margin: ${K.fmtTime(t('visitor'), 'en')} against ${K.fmtTime(t('super-visa'), 'en')} for the super visa on ${E.day(D)}. The super visa asks for more, including proof of the host’s income and private medical insurance, and only ${E.n(known('super-visa').length)} countries have a published super visa figure at all.` },
+      { q: 'How many Filipinos become permanent residents of Canada each year?', a: `IRCC’s open data counts the authorizations and visas of permanent residence it issues by citizenship: ${E.n(c23)} for citizens of the Philippines in 2023, ${E.n(c24)} in 2024 and ${E.n(c25)} in 2025. The count includes every program, from Express Entry and provincial nominees to family sponsorship and caregivers, and is rounded to the nearest 5.` },
+      { q: 'Are fewer Filipinos applying for permanent residence now?', a: `IRCC received ${E.n(prIn.last)} permanent residence applications from Filipino citizens from ${E.w12()}, against ${E.n(prIn.prev)} over the twelve months before, a change of ${E.ch(prIn.change)}. Applications received are counted in people, so a family of four filing together counts as four.` },
+      { q: 'How many people born in the Philippines became Canadian citizens?', a: `From ${E.w12()}, ${E.n(cit.last)} people born in the Philippines became Canadian citizens, ${dir(cit.change, 'more', 'fewer', 'about as many')} than in the twelve months before (${E.ch(cit.change)}). IRCC counts new citizens by country of birth, not by former citizenship, and publishes the figure every month.` },
     ],
     body: (h) => `
-<h2>Work permits from the Philippines today</h2>
-<p>This page leads with work permits, the line that covers Filipino workers hired by a Canadian employer; the study and family lines follow further down. IRCC’s line for a work permit requested from the Philippines stands at ${h.t(t('work'))} on ${h.day(D)}, ${rank('work')} countries that have a figure. Only ${h.n(known('work').length)} of the ${h.n(K.countriesOf('work').length)} countries in the file show a work permit time; for the others the file reads “no time published”, and IRCC gives no reason line by line.</p>
-${h.hist(SER.work, { max: 12, unit: 'w' })}
-<p>The two oldest rows are far apart: ${h.d(wk.first!, 'w')} in ${h.my(wk.firstDate!)} and ${h.d(at(SER.work, R[1].ircc)!, 'w')} in ${h.my(R[1].ircc)}. After that the archive is silent until ${h.day(R[2].ircc)}, because no public copy of the country file was saved in between. From ${h.day(R[2].ircc)} on, the copies come every few weeks and the line moves from ${h.d(at(SER.work, R[2].ircc)!, 'w')} to ${h.t(t('work'))}.</p>
-<h2>Once the worker is in Canada</h2>
-<p>A new permit requested from inside Canada, such as a change of employer, uses the line IRCC files under Canada: ${h.t(wIn.t)} now, against ${h.d(wInT.first!, 'w')} in our oldest copy. Renewing a permit before it expires is an extension. For extensions IRCC publishes a forward-looking queue by week of filing, which currently expects ${h.t(wExt.t)}, alongside a past time of ${h.t(wExtAlt.t)}. The ${h.a('work-permit-extension', 'extension page')} shows how to read the weekly queue, and the ${h.a('pgwp', 'post-graduation page')} covers graduates.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'work', c: C, m: 'none' }, t: 'Your work permit from the Philippines: estimated decision date' })}
-<h2>Caregivers: a different line</h2>
-<p>Caregivers often come to Canada first on a work permit and later apply for permanent residence. Those are two distinct requests with two distinct clocks. The work permit follows the Philippines country line above. The permanent residence application follows IRCC’s caregiver line in its forward-looking file, which is not split by country: ${h.t(cg.t)} for an application received on ${h.day(cg.date)}, with ${K.fmtAhead(cg.waiting ?? 0, 'en')} people waiting. The ${h.a('caregiver', 'caregiver page')} lists the queue month by month, and IRCC describes the programs on its ${h.src('caregivers', 'caregivers page')}.</p>
-<h2>Family and visit lines from the Philippines</h2>
-${h.table(['Application', 'Published time', 'Rank among countries', 'Reading before'], family(h), `Filed from the Philippines, IRCC country file of ${h.day(D)}.`, ['l', 'r', 'l', 'r'])}
-<p>A parent coming to see a worker or a student usually starts with a visitor visa, at ${h.t(t('visitor'))}. The super visa, for stays of up to five years at a time, takes ${h.t(t('super-visa'))} from the Philippines; it read ${h.d(sv.first!)} in our ${h.my(sv.firstDate!)} copy${sv.maxDate === sv.firstDate ? ', the highest value we hold for it' : `, and the highest value we hold is ${h.d(sv.max)}, on ${h.day(sv.maxDate)}`}. Its lowest was ${h.d(sv.min)} on ${h.day(sv.minDate)}. Sponsoring a dependent child from the Philippines is ${rank('child')}, at ${h.t(t('child'))}.</p>
-<h2>Filing from outside the Philippines</h2>
-<p>Many Filipino workers apply while living elsewhere, and the figure that applies is the one for the country they file from. On ${h.day(D)}, a work permit took ${others.map((c) => `${h.t(t('work', c))} from ${c === 'HK' ? 'Hong Kong' : c === 'AE' ? `the ${h.cn(c)}` : h.cn(c)}`).join(', ').replace(/, ([^,]*)$/, ' and $1')}. A person legally resident in one of those places uses that line, not the Philippines one.</p>
-<p>Two further points move a real date. Most applicants give fingerprints and a photo, as set out on IRCC’s ${h.src('biometrics', 'biometrics page')}, and the time to book that appointment is not in the published figure. A request for more documents also stops the clock until you answer. The ${h.a('method', 'method page')} describes how each reading is kept.</p>
+<h2>Settling, not only visiting</h2>
+<p>Many countries appear in IRCC’s data mostly through visitors and students. The Philippines stands out on the permanent side: over the latest twelve months it ranks ${ord(rCopr)} for permanent residence authorizations, ${ord(rCit)} for new Canadian citizens by country of birth, and ${ord(rFin)} for temporary residence applications finalized. Behind those ranks is a long chain of work permits, family sponsorship and caregiver programs that turns temporary stays into permanent ones.</p>
+<p>The monthly series below follows the two ends of that chain for Filipino citizens: permanent residence applications received by IRCC, and the authorizations it issued. A gap between them is normal, since an authorization comes months after the application; the useful signal is the direction of each line over a year.</p>
+${h.months(K.MONTHS, [['PR applications received', K.full('prIn', C)], ['PR authorizations issued', K.full('copr', C)], ['New citizens (born in the Philippines)', K.full('cit', C)]], { caption: 'Citizens of the Philippines by month, newest first. Source: IRCC, Operational Processing, open data (Open Government Licence of Canada); figures rounded to 5.' })}
+<h2>Caregivers and the family line</h2>
+<p>Home child care and home support workers have long been one of the main routes to permanent residence for Filipino workers. IRCC’s open data does not cross caregivers with citizenship in its monthly admissions file, so the figure here covers every nationality: ${h.n(care.last)} caregivers became permanent residents over the latest twelve months, ${h.ch(care.change)} on the year before. The ${h.a('caregiver', 'caregiver page')} explains the programs and how the time IRCC shows for them is counted.</p>
+<p>Family members follow. A spouse or child of a new permanent resident can be included in the application or sponsored later, and parents who want long visits before any sponsorship can apply for a ${h.a('super-visa', 'super visa')}. Permanent residence applications received from Filipino citizens stood at ${h.n(prIn.last)} over the latest twelve months, ${dir(prIn.change)} ${h.pa(prIn.change)} on the year before.</p>
+<h2>Temporary files: work first</h2>
+<p>Of the ${h.n(fin.last)} temporary residence applications IRCC finalized for Filipino citizens from ${h.w12()}, ${h.pct(ok.rate)} were approved, against ${h.pct(ok.prevRate)} a year earlier. ${nt.net != null && nt.net < 0 ? `IRCC closed ${h.n(-nt.net)} more Filipino files than it received over those months, so the backlog for this nationality shrank rather than grew.` : `IRCC received ${h.n(nt.net)} more Filipino files than it closed over those months, so the backlog for this nationality grew.`} Work permits, extensions and visitor records make up much of this line; IRCC’s national service standard for a work permit requested inside Canada is ${K.fmtStd(stdW.cur, 'en')}, met for ${h.pct(stdW.cur.perf)} of applications in ${K.fmtFy(stdW.fy, 'en')}.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'work-inside', c: C, m: 'none' }, t: 'Your work permit: estimated decision date' })}
+<p>Students are a smaller group: ${h.n(s23)} study permits took effect for Filipino citizens in 2023 and ${h.n(s25)} in 2025. Visitor visas approved reached ${h.n(v1.last)} over the latest twelve months. In ${K.EE_FULL}, Express Entry invited ${h.n(ee)} Filipino citizens.</p>
+<p>The ${h.a('pgwp', 'post-graduation work permit')} and ${h.a('work-permit-extension', 'work permit extensions')} are the usual next steps for Filipino graduates and workers already in Canada, and both are filed from inside Canada.</p>
+<h2>Where the time comes from</h2>
+<p>IRCC’s ${h.src('ptimes', 'processing times tool')} gives a time for the country you apply from. A Filipino caregiver already working in Canada applies from inside Canada, so the Philippines line does not apply; a relative visiting from Manila uses it. The open data above, by contrast, always counts people by citizenship. Pick the right line on IRCC’s tool, copy the time, and the calculator gives the date.</p>
 `,
   },
 });

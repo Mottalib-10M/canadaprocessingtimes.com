@@ -1,66 +1,57 @@
-import { defineGuide, type Helpers } from '../../lib/page-types';
+import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
+import { dir, ord, rank, studyYear } from './_pays-en';
 
-/* Mexique : délais courts pour visiter, étudier et travailler ; le super visa est l'exception, en forte baisse depuis 2025. */
+/* Mexico: the visitor visa line that appears in the data (eTA before, visa after), then work and the rest.
+ * Every figure comes from IRCC open data (OGL-Canada 2.0), by country of citizenship (of birth for new citizens). */
 const C = 'MX';
 const E = K.en;
-const D = K.L.dates.country;
-const t = (p: string, c = C) => K.readingOf(p, c).t;
-const days = (p: string, c = C) => K.daysOf(t(p, c));
-const ord = (n: number) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`; };
-function rank(p: string, c = C) {
-  const all = K.countriesOf(p).map((x) => K.daysOf(K.readingOf(p, x).t)).filter((x): x is number => x != null);
-  const d = days(p, c);
-  return { pos: d == null ? 0 : all.filter((x) => x < d).length + 1, n: all.length };
-}
-const S = { vis: `c:visitor-outside-canada:${C}`, sv: `c:supervisa:${C}`, st: `c:study:${C}`, wk: `c:work:${C}`, ch: `c:child_dependent:${C}` };
-const vis = K.fullTrend(S.vis)!, sv = K.fullTrend(S.sv)!, st = K.fullTrend(S.st)!, wk = K.fullTrend(S.wk)!;
-const chPts = K.points(S.ch);
-const childPub = days('child') != null;
-const rV = rank('visitor'), rS = rank('super-visa'), rSt = rank('study'), rW = rank('work');
-const LATAM = ['CO', 'PE', 'CL', 'GT', 'BR', 'US'].filter((c) => K.countriesOf('visitor').includes(c));
-
-function latam(h: Helpers) {
-  return [C, ...LATAM].map((c) => [
-    c === C ? `<strong>${h.cn(c)}</strong>` : K.COUNTRY_PAGE[c] ? h.a(K.COUNTRY_PAGE[c], h.cn(c)) : h.cn(c),
-    h.t(t('visitor', c)), h.t(t('study', c)), h.t(t('work', c)), h.t(t('super-visa', c)),
-  ]);
-}
+const v1 = K.ops12('v1', C), fin = K.ops12('trFin', C), rin = K.ops12('trIn', C), ok = K.approval12(C), all = K.approval12();
+const sp = K.ops12('spFin', C), prIn = K.ops12('prIn', C), copr = K.ops12('copr', C), cit = K.ops12('cit', C);
+const vs = K.full('v1', C);
+const iStart = vs.findIndex((x) => x != null && x >= 1000);
+const vStart = K.MONTHS[iStart];
+const v23 = K.fullYear('v1', C, '2023')!, v24 = K.fullYear('v1', C, '2024')!, v25 = K.fullYear('v1', C, '2025')!;
+const f23 = K.fullYear('trFin', C, '2023')!, f24 = K.fullYear('trFin', C, '2024')!, f25 = K.fullYear('trFin', C, '2025')!;
+const vx = K.fullExtremes('v1', C);
+const rFin = rank('trFin', C), rV = rank('v1', C);
+const s23 = studyYear(C, '2023')!, s25 = studyYear(C, '2025')!;
+const ee = K.eeCountry(K.EE_FULL, C);
+const stdV = K.stdOf('visitor')!, stdE = K.stdOf('eta')!;
+if (!(iStart > 0 && v23 * 20 < v24)) throw new Error('mexique : le texte suppose presque aucun visa de visiteur avant 2024, puis un saut');
+if (!(f24 > f23 && f25 < f24)) throw new Error('mexique : le texte suppose un pic des demandes finalisées en 2024');
 
 export default defineGuide({
   id: 'mexico', group: 'countries', order: 107, country: C,
-  tool: 'delai', toolArg: { g: 'visitor', c: C, only: 'visitor,super-visa,study,work,child' },
+  tool: 'pays', toolArg: { c: C },
   related: ['visitor-visa', 'eta', 'work-permit', 'super-visa', 'study-permit', 'brazil'],
-  sources: ['ptimes-country', 'visit', 'eta', 'work-permit', 'study-permit', 'super-visa', 'wayback'],
+  sources: ['open-data', 'od-study', 'od-std', 'ptimes', 'visit', 'eta', 'ogl'],
   en: {
     slug: 'mexico-processing-times',
-    nav: 'Mexico', card: 'Short visa and permit times, super visa drop, eTA rule',
-    title: 'Visitor Visa and Work Permit Times from Mexico 2026',
-    description: 'Processing times for applications made from Mexico in 2026: visitor visa, study and work permits among the fastest, the super visa line and the eTA option.',
-    h1: 'Processing times for applications made from Mexico',
-    intro: `IRCC’s file of ${E.day(D)} lists ${K.fmtTime(t('visitor'), 'en')} for a visitor visa from Mexico, ${K.fmtTime(t('study'), 'en')} for a study permit and ${K.fmtTime(t('work'), 'en')} for a work permit.`,
-    resume: `Applications made from Mexico are among the quickest in IRCC’s country file. On ${E.day(D)}, a visitor visa took ${K.fmtTime(t('visitor'), 'en')}, ${ord(rV.pos)} of ${E.n(rV.n)} countries counted from the fastest. A study permit took ${K.fmtTime(t('study'), 'en')}, ${ord(rSt.pos)} of ${E.n(rSt.n)}, and a work permit ${K.fmtTime(t('work'), 'en')}, ${ord(rW.pos)} of ${E.n(rW.n)}. The exception is the parent and grandparent super visa at ${K.fmtTime(t('super-visa'), 'en')}, though that line has come down sharply from ${E.d(sv.first!)} in our copy dated ${E.day(sv.firstDate!)}. ${childPub ? `A dependent child sponsorship is listed at ${K.fmtTime(t('child'), 'en')}.` : `IRCC currently publishes no time for a dependent child sponsorship processed for Mexico, although our ${E.my(chPts[0].date)} copy gave ${E.d(chPts[0].v, 'm')}.`} These are past times: IRCC reports how long it took to decide 80% of recent files from Mexico, from receipt of a complete application, excluding biometrics. Many Mexican travellers do not need a visa at all and can use an eTA instead, as explained below.`,
+    nav: 'Mexico', card: 'Visitor visas or eTA, work permits and residence from Mexico',
+    title: 'Visitor Visas and eTA for Mexican Citizens, 2026 Data',
+    description: 'Mexican citizens now file Canadian visitor visas in large numbers: 2026 open data on visas approved, eTA context, work and study files, and permanent residence.',
+    h1: 'Mexican citizens and Canada: the visitor visa line',
+    intro: `IRCC approved ${E.n(v1.last)} visitor visas for Mexican citizens from ${E.w12()}, a line that barely existed in its data before ${E.my(vStart)}.`,
+    resume: `The open data shows a clear break for Mexican travellers. In 2023 IRCC approved only ${E.n(v23)} visitor visas for citizens of Mexico, because most of them flew to Canada with an electronic travel authorization. From ${E.my(vStart)} the monthly count jumps into the thousands, after Canada brought back a visa requirement for many Mexican travellers: ${E.n(v24)} visas approved in 2024, ${E.n(v25)} in 2025 and ${E.n(v1.last)} from ${E.w12()}. Some travellers who meet IRCC’s conditions can still use an eTA. Across all temporary residence files, Mexico ranks ${ord(rFin)} among all countries of citizenship, with ${E.n(fin.last)} files finalized over the latest twelve months, ${E.pct(ok.rate)} of them approved, against ${E.pct(all.rate)} for all countries. These are counts, not waiting times: read the time IRCC shows for the country you apply from and the calculator dates it.`,
     faqs: [
-      { q: 'Do Mexicans need a visa or an eTA to visit Canada in 2026?', a: 'Since 29 February 2024, most Mexican citizens need a visitor visa. Those flying to Canada can apply for an eTA instead if they held a Canadian visa in the last ten years or hold a valid United States non-immigrant visa. Travellers who do not meet those conditions, or who arrive by land or sea, apply for a visitor visa.' },
-      { q: 'How long does a work permit from Mexico take?', a: `IRCC listed ${K.fmtTime(t('work'), 'en')} for a work permit applied for from Mexico on ${E.day(D)}, ${ord(rW.pos)} of ${E.n(rW.n)} countries with a figure. Our oldest copy, dated ${E.day(wk.firstDate!)}, showed ${E.d(wk.first!, 'w')}. Most work permits need a job offer and, in many cases, a positive labour market impact assessment obtained by the employer first, which takes time of its own.` },
-      { q: 'Why is the super visa from Mexico slower than a visitor visa?', a: `The super visa asks for more: an invitation from a child or grandchild in Canada who meets an income threshold, private medical insurance and an immigration medical exam. On ${E.day(D)} it was ${K.fmtTime(t('super-visa'), 'en')} from Mexico, against ${K.fmtTime(t('visitor'), 'en')} for a visitor visa. In ${E.my(sv.firstDate!)} it stood at ${E.d(sv.first!)}.` },
+      { q: 'Do Mexican citizens need a visa or an eTA for Canada?', a: `Most Mexican citizens now need a visitor visa. IRCC’s eTA page sets out the conditions under which some Mexican travellers flying to Canada can still use an electronic travel authorization. The open data shows the shift: ${E.n(v23)} visitor visas approved for Mexicans in 2023, then ${E.n(v24)} in 2024.` },
+      { q: 'How many Canadian visitor visas did Mexicans get this year?', a: `IRCC approved ${E.n(v1.last)} visitor visas for Mexican citizens from ${E.w12()}, against ${E.n(v1.prev)} over the twelve months before (${E.ch(v1.change)}). The busiest month since January 2023 was ${E.my(vx.hi![0])}, with ${E.n(vx.hi![1])} visas approved. Counts are rounded to the nearest 5 and cover visitor visas only, not the visas issued with a study or work permit.` },
+      { q: 'How many Mexicans became permanent residents of Canada?', a: `IRCC issued ${E.n(copr.last)} confirmations or visas of permanent residence to Mexican citizens over the latest twelve months, ${E.ch(copr.change)} on the year before. New permanent residence applications came to ${E.n(prIn.last)}, against ${E.n(prIn.prev)} a year earlier, counted in people and rounded to 5 by IRCC.` },
     ],
     body: (h) => `
-<h2>Quick lines for visiting, studying and working</h2>
-<p>Three of the five lines IRCC publishes for Mexico are short. The visitor visa, at ${h.t(t('visitor'))}, ranks ${ord(rV.pos)} of ${h.n(rV.n)} countries. The study permit, at ${h.t(t('study'))}, ranks ${ord(rSt.pos)} of ${h.n(rSt.n)}, and the work permit, at ${h.t(t('work'))}, ${ord(rW.pos)} of ${h.n(rW.n)}. For a student admitted to a Canadian program or a worker with an employer waiting, those figures leave room to apply a couple of months ahead and still get a decision before the start date, provided biometrics are given quickly.</p>
-<p>The visitor visa line has moved within a narrow band. It was ${h.d(vis.first!)} in our oldest copy (${h.day(vis.firstDate!)}), reached ${h.d(vis.max)} on ${h.day(vis.maxDate)} and is ${h.d(vis.last)} on ${h.day(vis.lastDate)}. Note that the copy of ${h.day(vis.firstDate!)} predates the return of the visa requirement for Mexican citizens, so the applications behind it were a smaller group than today.</p>
-${h.hist(S.vis, { max: 12, unit: 'd', caption: 'Visitor visa from Mexico: dated readings, newest first. Date = update date published by IRCC.' })}
-<h2>Visa or eTA</h2>
-<p>Canada brought back a visa requirement for most Mexican citizens on 29 February 2024. An exception remains for air travel: a Mexican citizen who held a Canadian visa in the past ten years, or who holds a valid United States non-immigrant visa, can apply for an ${h.a('eta', 'eTA')} instead, usually approved within minutes. Everyone else, and anyone arriving by land or by sea, needs a ${h.a('visitor-visa', 'visitor visa')}, and the time above applies to them. The conditions are set out on ${h.src('eta', 'IRCC’s eTA page')}.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'visitor', c: C, m: 'none' }, t: 'From Mexico: your estimated decision date' })}
-<h2>The super visa came down</h2>
-<p>The ${h.a('super-visa', 'super visa')} from Mexico is the one long line. Our first copy with a figure, dated ${h.day(sv.firstDate!)}, gave ${h.d(sv.first!)}. The next copy, dated ${h.day(K.points(S.sv)[1].date)}, shows ${h.d(K.points(S.sv)[1].v)}, and the time is ${h.t(t('super-visa'))} today, ${ord(rS.pos)} of ${h.n(rS.n)} countries. No copy of IRCC’s file survives between ${h.my(K.HIST.readings.country[1].ircc)} and ${h.my(K.HIST.readings.country[2].ircc)}, so we cannot say when in that period the drop happened.</p>
-<h2>Mexico among its neighbours</h2>
-<p>The table sets Mexico beside other countries of the Americas, all with the figures IRCC published on ${h.day(D)}. Where IRCC has no figure for a country, the cell says so; we do not fill it in.</p>
-${h.table(['Country of filing', 'Visitor visa', 'Study permit', 'Work permit', 'Super visa'], latam(h), `IRCC figures of ${h.day(D)}.`, ['l', 'r', 'r', 'r', 'r'])}
-<p>Work permit times from Mexico have shortened too: from ${h.d(wk.first!, 'w')} in ${h.my(wk.firstDate!)} to ${h.t(t('work'))} now, with a high of ${h.d(wk.max, 'w')} on ${h.day(wk.maxDate)}. The study permit followed a similar arc, peaking at ${h.d(st.max, 'w')} on ${h.day(st.maxDate)}.</p>
-<h2>A child sponsorship without a current figure</h2>
-<p>${childPub ? `IRCC lists ${h.t(t('child'))} for a ${h.a('dependent-child', 'dependent child sponsorship')} processed for Mexico.` : `For a ${h.a('dependent-child', 'dependent child sponsorship')}, IRCC no longer publishes a time for Mexico. Our archive holds ${h.n(chPts.length)} older figures: ${chPts.map((p) => `${h.d(p.v, 'm')} on ${h.day(p.date)}`).join(' and ')}. Without a current figure, the tool cannot estimate a date for that line, and the older values should not be read as today’s time.`} The way each value is read, and why a past time is not a forecast, is explained on the ${h.a('method', 'method page')}; every dated copy is listed on the ${h.a('history', 'history page')}.</p>
+<h2>From eTA to visitor visa</h2>
+<p>Before ${h.my(vStart)}, a Mexican tourist bound for Canada usually needed only an electronic travel authorization, and IRCC’s visitor visa counts for Mexico stayed close to zero: ${h.n(v23)} for all of 2023. The monthly series changes in ${h.my(vStart)}, the first month with more than a thousand visas approved. The peak came in ${h.my(vx.hi![0])} with ${h.n(vx.hi![1])}. Since then the line has settled, with ${h.n(v1.last)} visas approved over the latest twelve months, ${dir(v1.change, 'more', 'fewer', 'about as many')} than the year before.</p>
+<p>The ${h.a('eta', 'eTA page')} explains who can still travel with an electronic authorization, which IRCC limits to some Mexican travellers arriving by air. Everyone else applies for a ${h.a('visitor-visa', 'visitor visa')}, with biometrics. IRCC’s national service standard for a visitor visa from outside Canada is ${K.fmtStd(stdV.cur, 'en')}, met for ${h.pct(stdV.cur.perf)} of applications in ${K.fmtFy(stdV.fy, 'en')}; the time IRCC shows for Mexico on its ${h.src('ptimes', 'processing times tool')} is the one that counts for your file.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'visitor', c: C, m: 'none' }, t: 'Visitor visa from Mexico: estimated decision date' })}
+${h.months(K.MONTHS, [['Visitor visas approved', K.full('v1', C)], ['Temporary files received', K.full('trIn', C)], ['Temporary files finalized', K.full('trFin', C)]], { caption: 'Mexican citizens by month, newest first. Source: IRCC, Operational Processing, open data (Open Government Licence of Canada); figures rounded to 5.' })}
+<h2>A large temporary caseload</h2>
+<p>The visa requirement also lifted the total. IRCC finalized ${h.n(f23)} temporary residence applications from Mexican citizens in 2023, ${h.n(f24)} in 2024 and ${h.n(f25)} in 2025. Over the latest twelve months it received ${h.n(rin.last)} and finalized ${h.n(fin.last)}, which ranks Mexico ${ord(rFin)} among all countries of citizenship for decisions and ${ord(rV)} for visitor visas. ${h.pct(ok.rate)} of the files finalized were approved, against ${h.pct(ok.prevRate)} a year earlier; withdrawn files count among the finalized ones.</p>
+<p>Work permits, including those for seasonal farm jobs and employer-specific offers, sit in the same total; the ${h.a('work-permit', 'work permit page')} covers them. Students are fewer: ${h.n(s23)} study permits took effect for Mexican citizens in 2023 and ${h.n(s25)} in 2025, and new study permit applications finalized came to ${h.n(sp.last)} over the latest twelve months.</p>
+<h2>Before you book a flight</h2>
+<p>The jump in visitor visas changed how Mexican travellers plan. IRCC’s service standard for an eTA is ${K.fmtStd(stdE.cur, 'en')}, while a visa needs an online application, biometrics at a visa application centre and a decision by an IRCC office, so the planning horizon moves from days to the time IRCC shows on its tool. Enter that time in the calculator above with the date you expect IRCC to receive your complete file, including biometrics, and keep a margin before any fixed date such as a wedding, a conference or a school term. If you hold a valid visa from the United States, check the ${h.a('eta', 'eTA conditions')} first: they may still let you fly with an electronic authorization.</p>
+<h2>Residence and citizenship</h2>
+<p>IRCC issued ${h.n(copr.last)} permanent residence authorizations to Mexican citizens from ${h.w12()} and received ${h.n(prIn.last)} new applications, ${h.pa(prIn.change)} ${dir(prIn.change, 'more', 'fewer', 'about as many')} than the year before. Express Entry invited ${h.n(ee)} Mexicans in ${K.EE_FULL}, and ${h.n(cit.last)} people born in Mexico became Canadian citizens. A Mexican citizen living in the United States reads the line for the United States on IRCC’s tool; the counts here still place that person under Mexico.</p>
 `,
   },
 });

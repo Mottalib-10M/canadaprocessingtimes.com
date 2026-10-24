@@ -1,8 +1,8 @@
 ---
 /**
- * Accueil : le simulateur de délai, les repères de la semaine, la réponse repliée, la phrase de valeur ajoutée,
- * le tableau de tous les types de demande, ce qui a bougé depuis le dernier relevé, les familles de pages,
- * les textes longs en accordéons, la FAQ. Texte : src/content/home.ts ; chiffres : fichiers IRCC relus.
+ * Accueil : le simulateur de délai, les repères, la réponse repliée, la phrase de valeur ajoutée, les normes de
+ * service d'IRCC, les volumes des données ouvertes, les plus forts écarts par pays, les familles de pages, les textes
+ * longs en accordéons, la FAQ. Texte : src/content/home.ts ; chiffres : données ouvertes OGL-Canada 2.0 (trousse K).
  */
 import PageLayout from '../layouts/PageLayout.astro';
 import Clamp from './Clamp.astro';
@@ -24,17 +24,30 @@ const sources = sourceList(HOME.sources, lang);
 const jsonLd = [websiteSchema(lang), organizationSchema(lang), webPageSchema({ name: x.h1, description: x.description, path, lang }), webApplicationSchema({ name: x.h1, description: x.description, path, lang }), faqSchema(x.faqs, lang)];
 const fr = lang === 'fr';
 const pageLink = (id: string, text: string) => (hasRoute(id, lang) ? `<a href="${route(id, lang)}">${text}</a>` : GUIDES.some((g) => g.id === id) ? `<a href="${route(id, 'en')}" hreflang="en">${text}</a>` : text);
-const unit = (t: unknown) => (t && typeof t === 'object' && 'u' in (t as object) ? (t as { u: string }).u : 'd');
-const rows = K.PROGS.map((g) => {
-  const name = pageLink(K.PAGE_OF[g.id], g.name[lang]);
-  if (g.src === 'country' && !g.fixed) {
-    const r = K.rangeOf(g.id);
-    return [name, r ? (fr ? `${h.t(r.lo[1])} à ${h.t(r.hi[1])}` : `${h.t(r.lo[1])} to ${h.t(r.hi[1])}`) : h.t(null), fr ? `selon le pays (${r?.n ?? 0})` : `by country (${r?.n ?? 0})`, h.day(K.L.dates.country)];
-  }
-  const r = K.readingOf(g.id), tr = K.recentTrend(r.series);
-  return [name, h.t(r.t), tr?.delta != null ? K.fmtDelta(tr.delta, unit(r.t), lang) : '', h.day(r.date)];
+
+/* Normes de service : une ligne par norme distincte (les parrainages hors Canada partagent la même). */
+const FAMILY = { en: 'Family class from abroad (spouses, partners, children)', fr: 'Regroupement familial depuis l’étranger (conjoints, partenaires, enfants)' };
+const seen = new Set<string>();
+const stdRows = K.PROGS.flatMap((g) => {
+  const s = K.stdOf(g.id); if (!s) return [];
+  const key = JSON.stringify(s.cur); if (seen.has(key)) return []; seen.add(key);
+  const name = g.id === 'spousal-out-roc' ? FAMILY[lang] : g.name[lang];
+  return [[pageLink(K.PAGE_OF[g.id], name), K.fmtStd(s.cur, lang), `${h.pct(s.cur.perf)} (${h.n(s.cur.total)})`, h.pct(s.prev?.perf)]];
 });
-const moves = K.biggestMoves(8).map((m) => [pageLink(K.PAGE_OF[m.prog!.id], m.prog!.name[lang]) + (m.country ? ` · ${h.cn(m.country)}` : ''), K.fmtDays(m.prev, unit(K.readingOf(m.prog!.id, m.country).t), lang), K.fmtDays(m.last, unit(K.readingOf(m.prog!.id, m.country).t), lang), K.fmtDelta(m.delta, unit(K.readingOf(m.prog!.id, m.country).t), lang)]);
+const fyCur = K.fmtFy(K.STD_FY, lang), fyPrev = K.fmtFy(K.STD_YEARS[K.STD_YEARS.length - 2], lang);
+
+/* Volumes des douze derniers mois. */
+const vol = (label: string, y: { last: number | null; prev: number | null; change: number | null }) => [label, h.n(y.last), h.n(y.prev), h.ch(y.change)];
+const volRows = [
+  ...(['trIn', 'trFin', 'trOk', 'v1', 'spFin', 'prIn', 'copr', 'cit'] as const).map((m) => vol(K.METRIC[m][lang], K.ops12(m))),
+  vol(fr ? 'Résidents permanents admis' : 'Permanent residents admitted', K.pr12('all')),
+];
+
+/* Visas de visiteur approuvés : plus forts écarts sur un an parmi les grands pays soumis au visa. */
+const moves = K.MAJOR.map((c) => ({ c, y: K.ops12('v1', c) }))
+  .filter((m) => (m.y.prev ?? 0) >= 1000 && m.y.change != null)
+  .sort((a, b) => Math.abs(b.y.change!) - Math.abs(a.y.change!)).slice(0, 8)
+  .map((m) => [K.COUNTRY_PAGE[m.c] ? pageLink(K.COUNTRY_PAGE[m.c], h.cn(m.c)) : h.cn(m.c), h.n(m.y.prev), h.n(m.y.last), h.ch(m.y.change), h.pct(K.approval12(m.c).rate)]);
 ---
 <PageLayout title={x.title} description={x.description} lang={lang} jsonLd={jsonLd} faqs={x.faqs} sources={sources}>
   <header class="mb-4">
@@ -49,14 +62,19 @@ const moves = K.biggestMoves(8).map((m) => [pageLink(K.PAGE_OF[m.prog!.id], m.pr
   <Clamp text={x.resume} lang={lang} id="clamp-home" class="my-8" />
   <p class="my-6 border-l-4 border-accent-500 pl-4 text-navy-800"><strong>{x.valeur}</strong></p>
   <section class="mt-10">
-    <h2 class="text-2xl font-bold text-navy-900">{fr ? 'Tous les délais publiés, type par type' : 'Every published time, application by application'}</h2>
+    <h2 class="text-2xl font-bold text-navy-900">{fr ? 'Les normes de service d’IRCC et leurs résultats' : 'IRCC’s service standards and their results'}</h2>
     <p class="mt-2 text-navy-700">{x.tableIntro}</p>
-    <div data-chrome><Fragment set:html={h.table([fr ? 'Type de demande' : 'Application type', fr ? 'Délai publié' : 'Published time', fr ? 'Écart avec le relevé précédent' : 'Change since previous reading', fr ? 'Date IRCC' : 'IRCC date'], rows, fr ? 'Délais publiés par IRCC, relus sur ses fichiers. Pour les demandes faites hors du Canada, le délai dépend du pays : le tableau donne le plus court et le plus long.' : 'Times published by IRCC, read from its files. For applications made from outside Canada the time depends on the country: the table gives the shortest and the longest.', ['l', 'r', 'r', 'l'])} /></div>
+    <div data-chrome><Fragment set:html={h.table([fr ? 'Type de demande' : 'Application type', fr ? 'Norme (80 % des demandes)' : 'Standard (80% of applications)', fr ? `Tenue en ${fyCur} (demandes)` : `Met in ${fyCur} (applications)`, fr ? `Tenue en ${fyPrev}` : `Met in ${fyPrev}`], stdRows, fr ? 'Source : Inventaire des services du gouvernement du Canada, normes de service et résultats d’IRCC, données ouvertes (Licence du gouvernement ouvert du Canada).' : 'Source: Government of Canada service inventory, IRCC service standards and results, open data (Open Government Licence of Canada).', ['l', 'r', 'r', 'r'])} /></div>
+  </section>
+  <section class="mt-10">
+    <h2 class="text-2xl font-bold text-navy-900">{fr ? 'Les volumes d’IRCC sur douze mois' : 'IRCC volumes over twelve months'}</h2>
+    <p class="mt-2 text-navy-700">{x.volIntro}</p>
+    <div data-chrome><Fragment set:html={h.table([fr ? 'Indicateur' : 'Measure', fr ? '12 derniers mois' : 'Last 12 months', fr ? '12 mois d’avant' : 'Previous 12 months', fr ? 'Écart' : 'Change'], volRows, fr ? 'Source : IRCC, Traitement opérationnel et Résidents permanents, données ouvertes (Licence du gouvernement ouvert du Canada) ; chiffres arrondis à 5.' : 'Source: IRCC, Operational Processing and Permanent Residents, open data (Open Government Licence of Canada); figures rounded to 5.', ['l', 'r', 'r', 'r'])} /></div>
   </section>
   {moves.length > 0 && <section class="mt-10">
-    <h2 class="text-2xl font-bold text-navy-900">{fr ? 'Ce qui a le plus bougé au dernier relevé' : 'What moved most at the latest reading'}</h2>
+    <h2 class="text-2xl font-bold text-navy-900">{fr ? 'Visas de visiteur : les plus forts écarts sur un an' : 'Visitor visas: the largest changes over a year'}</h2>
     <p class="mt-2 text-navy-700">{x.movesIntro}</p>
-    <div data-chrome><Fragment set:html={h.table([fr ? 'Demande' : 'Application', fr ? 'Avant' : 'Before', fr ? 'Maintenant' : 'Now', fr ? 'Écart' : 'Change'], moves, undefined, ['l', 'r', 'r', 'r'])} /></div>
+    <div data-chrome><Fragment set:html={h.table([fr ? 'Pays de citoyenneté' : 'Country of citizenship', fr ? '12 mois d’avant' : 'Previous 12 months', fr ? '12 derniers mois' : 'Last 12 months', fr ? 'Écart' : 'Change', fr ? 'Taux d’approbation, résidence temporaire' : 'Temporary residence approval rate'], moves, undefined, ['l', 'r', 'r', 'r', 'r'])} /></div>
   </section>}
   <section class="mt-10"><Body html={x.why(h)} path={path} lang={lang} /></section>
   <section class="mt-10" data-chrome>

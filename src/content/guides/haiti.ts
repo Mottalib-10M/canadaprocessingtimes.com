@@ -1,88 +1,84 @@
 import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
-import { tm, tr, rankText, median, lines, ser } from './_pays';
+import { dirEn, dirFr, ord, eeRank, yearsTable } from './_pays';
 
-/* Haïti : des permis d'études parmi les plus rapides, des enfants parrainés parmi les plus lents. */
+/* Haïti : données ouvertes d'IRCC par pays de citoyenneté (OGL-Canada 2.0), calculées au build. Angle : le contexte
+ * familial et humanitaire, la hausse des dossiers temporaires finalisés et la part approuvée qui remonte. */
 const C = 'HT';
-const D = K.L.dates.country;
 const E = K.en, F = K.fr;
-const vi = tr('visitor', C)!, sv = tr('super-visa', C)!, st = tr('study', C)!, wk = tr('work', C)!, ch = tr('child', C)!;
-const ft = (g: 'visitor' | 'super-visa' | 'study' | 'work' | 'child', l: 'en' | 'fr') => K.fmtTime(tm(g, C), l);
-const childAll = K.countriesOf('child').filter((x) => K.daysOf(K.readingOf('child', x).t) != null);
-const DO = (g: 'visitor' | 'study' | 'work', l: 'en' | 'fr') => K.fmtTime(K.readingOf(g, 'DO').t, l);
-const childRows = (l: 'en' | 'fr') => childAll.map((c) => [c, K.daysOf(K.readingOf('child', c).t)!] as const).sort((a, b) => a[1] - b[1]).map(([c]) => [c === C ? `<strong>${K.countryName(c, l)}</strong>` : K.countryName(c, l), K.fmtTime(K.readingOf('child', c).t, l)]);
+const tf = K.ops12('trFin', C), tin = K.ops12('trIn', C), sp = K.ops12('spFin', C), st = K.study12(C), v1 = K.ops12('v1', C), pr = K.ops12('prIn', C), co = K.ops12('copr', C), ci = K.ops12('cit', C);
+const a = K.approval12(C), all = K.approval12();
+const tfY = (y: string) => K.fullYear('trFin', C, y);
+const t24 = tfY('2024'), t25 = tfY('2025');
+const jump = K.pctOf((t25 ?? 0) - (t24 ?? 0), t24);
+const ee = K.eeCountry(K.EE_FULL, C), eeR = eeRank(K.EE_FULL, C);
+const sChild = K.stdOf('child')!, sSp = K.stdOf('spousal-out-roc')!, sVis = K.stdOf('visitor')!;
+const ext = K.fullExtremes('trFin', C);
+// « bond » n'est vrai que si les dossiers temporaires finalisés de 2025 dépassent ceux de 2024 d'au moins 30 %.
+if (!(jump != null && jump >= 30)) throw new Error('haiti : les dossiers temporaires finalisés n’ont plus bondi en 2025, réécrire');
+if (!(eeR == null || eeR > 20)) throw new Error('haiti : Haïti est désormais dans les vingt premiers pays d’Entrée express, réécrire « pèse peu »');
 
 export default defineGuide({
   id: 'haiti', group: 'countries', order: 115, country: C,
-  tool: 'delai', toolArg: { g: 'child', c: C, only: 'visitor,super-visa,study,work,child' },
+  tool: 'pays', toolArg: { c: C },
   related: ['dependent-child', 'study-permit', 'visitor-visa', 'super-visa', 'cameroon', 'france'],
-  sources: ['ptimes-country', 'spouse', 'study-permit', 'visit', 'wayback'],
+  sources: ['ptimes', 'open-data', 'od-pr', 'od-study', 'od-std', 'spouse', 'check-status', 'ogl'],
   en: {
     slug: 'processing-times-haiti',
-    nav: 'Haiti', card: 'Fast study permits, slow child sponsorship, visitor visa from Haiti',
-    title: 'Child Sponsorship and Visa Processing Times from Haiti, 2026',
-    description: 'Canadian child sponsorship, study permit, visitor visa, super visa and work permit processing times for applicants in Haiti in 2026, with each dated reading.',
-    h1: 'Processing times for applications filed from Haiti',
-    intro: `IRCC’s file of ${E.day(D)} shows the two extremes from Haiti: ${ft('study', 'en')} for a study permit, ${ft('child', 'en')} to sponsor a child.`,
-    resume: `Applications filed from Haiti sit at both ends of IRCC’s country file of ${E.day(D)}. A study permit takes ${ft('study', 'en')}, ${rankText('study', C, 'en')} countries with a figure, where the middle value is ${E.d(median('study'), 'w')}. Sponsoring a dependent child who lives in Haiti takes ${ft('child', 'en')}, the longest of the ${E.n(childAll.length)} countries for which IRCC publishes that line. In between, a visitor visa takes ${ft('visitor', 'en')}, a super visa ${ft('super-visa', 'en')} and a work permit ${ft('work', 'en')}. The child line has stayed long in every copy we keep: ${E.d(ch.first!, 'm')} on ${E.day(ch.firstDate!)}, ${E.d(ch.max, 'm')} at its highest on ${E.day(ch.maxDate)}. The visitor visa, by contrast, read ${E.d(vi.max)} on ${E.day(vi.maxDate)} and has been under a month in recent readings. These are past times: the delay within which IRCC finished 80% of recent files from Haiti, counted from receipt of a complete application and without the time needed to give biometrics.`,
+    nav: 'Haiti', card: 'Family files, temporary decisions and permanent residence for Haitians',
+    title: 'Haitian Applicants: IRCC Family and Visa Data for 2026',
+    description: 'Haitian citizens in IRCC open data for 2026: temporary files finalized, approved share, family sponsorship, study permits and a decision date calculator.',
+    h1: 'Applications to Canada by Haitian citizens',
+    intro: `IRCC finalized ${E.n(tf.last)} temporary residence applications from Haitian citizens from ${E.w12()}, approving ${E.pct(a.rate)} of them.`,
+    resume: `For Haitians, applications to Canada are often family matters: joining a spouse or a parent in Montreal, bringing a child, or visiting relatives while the situation at home remains difficult. IRCC’s open data show the scale. From ${E.w12()}, the department finalized ${E.n(tf.last)} temporary residence applications from Haitian citizens and approved ${E.pct(a.rate)}, against ${E.pct(a.prevRate)} the year before and ${E.pct(all.rate)} for all countries. In calendar years, temporary files finalized went from ${E.n(t24)} in 2024 to ${E.n(t25)} in 2025. New study permit applications finalized came to ${E.n(sp.last)}. On the permanent side, IRCC received ${E.n(pr.last)} permanent residence applications from Haitian citizens and issued ${E.n(co.last)} authorizations. Waiting times come from IRCC’s tool for the country you apply from, and the calculator turns them into a date.`,
     faqs: [
-      { q: 'How long does it take to sponsor a child living in Haiti?', a: `${ft('child', 'en')} in IRCC’s file of ${E.day(D)}, the longest among the ${E.n(childAll.length)} countries with a published figure. The time runs from receipt of the complete sponsorship and permanent residence application to the decision. Identity and relationship documents, and in some cases DNA testing requested by IRCC, can add time that the figure does not include.` },
-      { q: 'Why is a study permit so fast from Haiti?', a: `IRCC does not explain individual lines. Its file shows ${ft('study', 'en')} for Haiti on ${E.day(D)}, after ${E.d(st.first!, 'w')} in our oldest copy, dated ${E.day(st.firstDate!)}. A past time only describes files that were decided; how many applications were refused or withdrawn is not part of it.` },
-      { q: 'Can a Haitian living in the Dominican Republic or the United States use that country’s line?', a: 'If you legally reside there, yes: IRCC sorts visa and permit applications by the country you apply from. The tool lets you compare the line for Haiti with the line for your country of residence on the same date before you file.' },
+      { q: 'How long does it take to sponsor a child or spouse living in Haiti?', a: `IRCC’s service standard for family class files processed overseas, which covers a spouse or a dependent child in Haiti, is ${K.fmtStd(sSp.cur, 'en')}, met for ${E.pct(sSp.cur.perf)} of applications nationally in ${K.fmtFy(sSp.fy, 'en')}. The time for your own file is on IRCC’s processing times tool; medical exams and documents from Haiti can add months.` },
+      { q: 'What share of Haitian temporary residence applications does IRCC approve?', a: `IRCC approved ${E.pct(a.rate)} of the temporary residence applications from Haitian citizens it finalized from ${E.w12()}, against ${E.pct(a.prevRate)} the twelve months before. Withdrawals count as finalized, so this is not a refusal rate, and it mixes visits, studies, work permits and extensions decided one file at a time.` },
+      { q: 'Do Haitians living in the Dominican Republic read the Haitian processing time?', a: 'No. IRCC’s processing times tool asks for the country you apply from, normally where you live legally. A Haitian with status in the Dominican Republic or in the United States reads that country’s line. The volumes on this page count Haitian citizens wherever they filed.' },
     ],
     body: (h) => `
-<h2>Every line from Haiti</h2>
-${lines(h, C, ['study', 'visitor', 'super-visa', 'work', 'child'])}
-<h2>Sponsoring a child: the longest line</h2>
-<p>For a Canadian citizen or permanent resident whose child lives in Haiti, the wait is long. IRCC publishes ${h.t(tm('child', C))} for this line, and only ${h.n(childAll.length)} countries have a dependent child figure at all. The table ranks them from shortest to longest.</p>
-${h.table(['Country', 'Dependent child'], childRows('en'), `IRCC country file of ${h.day(D)}; the other countries are marked as not having enough data.`, ['l', 'r'])}
-${h.hist(ser('child', C), { max: 10, unit: 'm' })}
-${h.mini('delai', { p: ['m'], d: { g: 'child', c: C, m: 'none' }, t: 'Child sponsored from Haiti: your date' })}
-<p>The figure covers the whole permanent residence file of the child, from the day IRCC receives the complete application to the decision. Interviews, document checks and, when IRCC asks for it, DNA testing to prove the relationship are part of what makes the line long, and the time to complete them on your side is not counted. The ${h.a('dependent-child', 'dependent child page')} explains the forms and what IRCC checks.</p>
-<h2>Studies: one of the shortest lines</h2>
-<p>A study permit from Haiti takes ${h.t(tm('study', C))}. The line was ${h.d(st.first!, 'w')} in the copy of ${h.day(st.firstDate!)} and has shortened in the readings of 2026. Students admitted in Quebec, the most common destination for French-speaking Haitian students, need a CAQ before applying to IRCC; that Quebec step has its own time.</p>
-<h2>Visits and work</h2>
-<p>A visitor visa takes ${h.t(tm('visitor', C))}, ${rankText('visitor', C, 'en')} countries, after a reading of ${h.d(vi.max)} on ${h.day(vi.maxDate)}. Parents and grandparents can apply for the ${h.a('super-visa', 'super visa')}, at ${h.t(tm('super-visa', C))} from Haiti, ${rankText('super-visa', C, 'en')} countries; the line read ${h.d(sv.first!)} on ${h.day(sv.firstDate!)}. A work permit takes ${h.t(tm('work', C))}, against ${h.d(wk.first!, 'w')} in our oldest copy.</p>
-<h2>Reading the estimate for a family file</h2>
-<p>Choose the dependent child line and the month IRCC received the sponsorship. The tool adds ${h.t(tm('child', C))} and says how far you are from that date. With a line this long, a small weekly change in the figure moves the estimate by weeks, so compare the result with the change since the previous reading. Being past the date is not a refusal: one file in five takes longer than the published time. At that point, check your account for any request you missed, then use IRCC’s web form; the ${h.a('beyond-processing-time', 'page on delays beyond the published time')} lists the steps.</p>
-<h2>Haiti next to its neighbour</h2>
-<p>On the same date, a resident of the Dominican Republic waits ${DO('visitor', 'en')} for a visitor visa, ${DO('study', 'en')} for a study permit and ${DO('work', 'en')} for a work permit. Comparing lines only helps someone who legally lives in the other country; IRCC applies the line of the country you file from.</p>
-<h2>Biometrics and where you apply</h2>
-<p>Each visa or permit application needs biometrics given at a visa application centre, and that wait is not part of IRCC’s figure. Haitians who live legally in another country usually apply from there, and the figure of that country applies to them.</p>
+<h2>Families first</h2>
+<p>Canada has one of the largest Haitian communities outside Haiti, mostly in Quebec, and much of the traffic with IRCC is about families: spouses, children, parents. Sponsorship of a spouse or a ${h.a('dependent-child', 'dependent child')} living in Haiti is processed overseas; IRCC’s standard for those family files is ${K.fmtStd(sChild.cur, 'en')}, met for ${h.pct(sChild.cur.perf)} of applications nationally in ${K.fmtFy(sChild.fy, 'en')}. Documents from Haiti, medical exams and interviews can lengthen a file, and IRCC lets applicants follow it through its ${h.src('check-status', 'status tools')}.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'child', c: C, m: 'none' }, t: 'Child sponsorship from Haiti: estimated decision date' })}
+<p>Copy into the calculator the time IRCC’s ${h.src('ptimes', 'Check processing times tool')} shows for your type of file, and the month IRCC received it. The result is an estimate, not a date IRCC commits to.</p>
+<h2>Temporary files: a jump in decisions</h2>
+<p>Temporary residence files finalized for Haitian citizens rose from ${h.n(t24)} in 2024 to ${h.n(t25)} in 2025, ${dirEn(jump)} ${h.pa(jump)}. Over the latest twelve months, IRCC finalized ${h.n(tf.last)} and received ${h.n(tin.last)}, and the busiest month of the series was ${ext ? h.my(ext.hi[0]) : ''} with ${h.n(ext?.hi[1] ?? null)} files. The approved share among finalized files moved from ${h.pct(a.prevRate)} to ${h.pct(a.rate)}. Withdrawn files count as finalized, so the share is a broad signal, not the odds of a visa.</p>
+${yearsTable(h, C, ['trIn', 'trFin', 'trOk', 'v1', 'spFin'], 'Haitian citizens by calendar year. Source: IRCC, Operational Processing, open data; figures rounded to 5.')}
+<p>Visitor visas approved for Haitian citizens came to ${h.n(v1.last)} over twelve months, ${dirEn(v1.change)} ${h.pa(v1.change)}. IRCC’s standard for a ${h.a('visitor-visa', 'visitor visa')} is ${K.fmtStd(sVis.cur, 'en')}, met for only ${h.pct(sVis.cur.perf)} of applications nationally in ${K.fmtFy(sVis.fy, 'en')}. Parents of Canadian residents can also weigh the ${h.a('super-visa', 'super visa')} for longer stays.</p>
+<h2>Studies and permanent residence</h2>
+<p>New study permit applications finalized for Haitian citizens came to ${h.n(sp.last)} over twelve months, ${dirEn(sp.change)} ${h.pa(sp.change)}, and ${h.n(st.last)} study permits took effect, ${dirEn(st.change)} ${h.pa(st.change)}. Haitian students mostly choose French-language institutions in Quebec. IRCC received ${h.n(pr.last)} permanent residence applications from Haitians, ${dirEn(pr.change)} ${h.pa(pr.change)}, and issued ${h.n(co.last)} authorizations. Express Entry plays a small part: ${h.n(ee)} Haitians were invited in ${K.EE_FULL}, ${ord(eeR, 'en')} by citizenship. ${h.n(ci.last)} people born in Haiti became Canadian citizens over twelve months. The ${h.a('cameroon', 'Cameroon')} and ${h.a('france', 'France')} pages show two French-speaking profiles where studies and Express Entry weigh more.</p>
+<h2>Country of residence or of citizenship</h2>
+<p>IRCC’s tool keys waiting times to where you apply from; its open data count citizens. Many Haitians live in the Dominican Republic, the United States or Chile, and apply from there. They read that country’s line on the tool, while counting as Haitians in the volumes above.</p>
+<h2>Practical points for Haitian files</h2>
+<p>Biometrics and documents are where Haitian files most often lose time. Travel to the visa application centre in Port-au-Prince can be difficult, and some applicants give biometrics in a neighbouring country instead, which IRCC allows at any of its centres. Civil status documents should come from the Archives nationales and match across every form. For a sponsorship, proof of the relationship, such as photos, messages and money transfers over time, helps an officer decide without an interview. Keep IRCC informed of any change of address or phone number so that requests reach you.</p>
 `,
   },
   fr: {
     slug: 'delais-haiti',
-    nav: 'Haïti', card: 'Permis d’études rapides, parrainage d’enfant lent, visa de visiteur depuis Haïti',
-    title: 'Délai parrainage d’enfant et visa depuis Haïti, 2026',
-    description: 'Délais canadiens du parrainage d’enfant, du permis d’études, du visa de visiteur, du super visa et du permis de travail depuis Haïti en 2026, avec historique.',
-    h1: 'Délais des demandes déposées depuis Haïti',
-    intro: `Le fichier d’IRCC du ${F.day(D)} montre les deux extrêmes depuis Haïti : ${ft('study', 'fr')} pour un permis d’études, ${ft('child', 'fr')} pour parrainer un enfant.`,
-    resume: `Les demandes déposées depuis Haïti se trouvent aux deux bouts du fichier par pays d’IRCC du ${F.day(D)}. Un permis d’études prend ${ft('study', 'fr')}, au ${rankText('study', C, 'fr')} pays chiffrés, pour une valeur médiane de ${F.d(median('study'), 'w')}. Parrainer un enfant à charge qui vit en Haïti prend ${ft('child', 'fr')}, le plus long des ${F.n(childAll.length)} pays pour lesquels IRCC publie cette ligne. Entre les deux, un visa de visiteur prend ${ft('visitor', 'fr')}, un super visa ${ft('super-visa', 'fr')} et un permis de travail ${ft('work', 'fr')}. La ligne des enfants est restée longue dans chaque copie que nous gardons : ${F.d(ch.first!, 'm')} le ${F.day(ch.firstDate!)}, ${F.d(ch.max, 'm')} au plus haut le ${F.day(ch.maxDate)}. Le visa de visiteur, lui, indiquait ${F.d(vi.max)} le ${F.day(vi.maxDate)} et reste sous le mois dans les relevés récents. Ce sont des délais passés : le temps dans lequel IRCC a terminé 80 % des dossiers récents venus d’Haïti, à partir de la réception d’une demande complète, sans le temps de la biométrie.`,
+    nav: 'Haïti', card: 'Dossiers familiaux, décisions temporaires et résidence permanente des Haïtiens',
+    title: 'Demandes des Haïtiens : famille et visas chez IRCC en 2026',
+    description: 'Les citoyens haïtiens dans les données ouvertes d’IRCC en 2026 : dossiers temporaires finalisés, part approuvée, parrainage familial, études, date estimée.',
+    h1: 'Les demandes des citoyens haïtiens au Canada',
+    intro: `IRCC a finalisé ${F.n(tf.last)} demandes de résidence temporaire de citoyens haïtiens de ${F.w12()}, et en a approuvé ${F.pct(a.rate)}.`,
+    resume: `Pour les Haïtiens, une demande au Canada est souvent une affaire de famille : rejoindre un conjoint ou un parent à Montréal, faire venir un enfant, rendre visite à des proches pendant que la situation reste difficile au pays. Les données ouvertes d’IRCC en donnent l’ampleur. De ${F.w12()}, le ministère a finalisé ${F.n(tf.last)} demandes de résidence temporaire de citoyens haïtiens et en a approuvé ${F.pct(a.rate)}, contre ${F.pct(a.prevRate)} l’année précédente et ${F.pct(all.rate)} tous pays confondus. Par année civile, les dossiers temporaires finalisés passent de ${F.n(t24)} en 2024 à ${F.n(t25)} en 2025. Les nouvelles demandes de permis d’études finalisées s’établissent à ${F.n(sp.last)}. Côté permanent, IRCC a reçu ${F.n(pr.last)} demandes de résidence permanente de citoyens haïtiens et délivré ${F.n(co.last)} autorisations. Les délais viennent de l’outil d’IRCC pour le pays depuis lequel vous déposez, et le calculateur les transforme en date.`,
     faqs: [
-      { q: 'Combien de temps pour parrainer un enfant qui vit en Haïti ?', a: `${ft('child', 'fr')} dans le fichier d’IRCC du ${F.day(D)}, le plus long des ${F.n(childAll.length)} pays qui ont un chiffre publié. Le délai court de la réception de la demande complète de parrainage et de résidence permanente jusqu’à la décision. Les pièces d’identité et de filiation, et parfois un test d’ADN demandé par IRCC, ajoutent un temps que le chiffre ne compte pas.` },
-      { q: 'Pourquoi le permis d’études est-il si rapide depuis Haïti ?', a: `IRCC n’explique pas ses lignes une à une. Son fichier indique ${ft('study', 'fr')} pour Haïti le ${F.day(D)}, après ${F.d(st.first!, 'w')} dans notre plus ancienne copie, datée du ${F.day(st.firstDate!)}. Un délai passé décrit seulement les dossiers tranchés ; la part de refus ou de désistements n’y entre pas.` },
-      { q: 'Un Haïtien qui vit en République dominicaine ou aux États-Unis peut-il utiliser la ligne de ce pays ?', a: 'S’il y réside légalement, oui : IRCC classe les demandes de visa et de permis selon le pays d’où l’on dépose. L’outil permet de comparer la ligne d’Haïti et celle de votre pays de résidence à la même date avant de déposer.' },
+      { q: 'Combien de temps faut-il pour parrainer un enfant ou un conjoint en Haïti ?', a: `La norme de service d’IRCC pour les dossiers de la catégorie du regroupement familial traités à l’étranger, qui couvre un conjoint ou un enfant à charge en Haïti, est de ${K.fmtStd(sSp.cur, 'fr')}, tenue pour ${F.pct(sSp.cur.perf)} des demandes à l’échelle du pays en ${K.fmtFy(sSp.fy, 'fr')}. Le délai de votre dossier se lit dans l’outil d’IRCC ; examens médicaux et documents haïtiens peuvent ajouter des mois.` },
+      { q: 'Quelle part des demandes temporaires haïtiennes IRCC approuve-t-il ?', a: `IRCC a approuvé ${F.pct(a.rate)} des demandes de résidence temporaire de citoyens haïtiens qu’il a finalisées de ${F.w12()}, contre ${F.pct(a.prevRate)} sur les douze mois précédents. Les retraits comptent parmi les dossiers finalisés : ce n’est donc pas un taux de refus, et la part mêle visites, études, permis de travail et prolongations jugés un par un.` },
+      { q: 'Un Haïtien qui vit en République dominicaine lit-il le délai d’Haïti ?', a: 'Non. L’outil des délais d’IRCC demande le pays depuis lequel vous déposez, en général celui où vous résidez légalement. Un Haïtien qui a un statut en République dominicaine ou aux États-Unis lit la ligne de ce pays. Les volumes de cette page comptent les citoyens haïtiens où qu’ils aient déposé.' },
     ],
     body: (h) => `
-<h2>Toutes les lignes depuis Haïti</h2>
-${lines(h, C, ['study', 'visitor', 'super-visa', 'work', 'child'])}
-<h2>Parrainer un enfant : la ligne la plus longue</h2>
-<p>Pour un citoyen canadien ou un résident permanent dont l’enfant vit en Haïti, l’attente est longue. IRCC publie ${h.t(tm('child', C))} pour cette ligne, et seuls ${h.n(childAll.length)} pays ont un chiffre pour les enfants à charge. Le tableau les classe du plus court au plus long.</p>
-${h.table(['Pays', 'Enfant à charge'], childRows('fr'), `Fichier par pays d’IRCC du ${h.day(D)} ; les autres pays sont marqués comme manquant de données.`, ['l', 'r'])}
-${h.hist(ser('child', C), { max: 10, unit: 'm' })}
-${h.mini('delai', { p: ['m'], d: { g: 'child', c: C, m: 'none' }, t: 'Enfant parrainé depuis Haïti : votre date' })}
-<p>Le chiffre couvre tout le dossier de résidence permanente de l’enfant, du jour où IRCC reçoit la demande complète jusqu’à la décision. Les entrevues, la vérification des documents et, quand IRCC le demande, le test d’ADN pour prouver le lien de filiation expliquent en partie la longueur de la ligne, et le temps de les faire de votre côté n’est pas compté. La ${h.a('dependent-child', 'page des enfants à charge')} explique les formulaires et ce qu’IRCC vérifie.</p>
-<h2>Études : une des lignes les plus courtes</h2>
-<p>Un permis d’études depuis Haïti prend ${h.t(tm('study', C))}. La ligne indiquait ${h.d(st.first!, 'w')} dans la copie du ${h.day(st.firstDate!)} et s’est raccourcie dans les relevés de 2026. Les étudiants admis au Québec, destination la plus fréquente des étudiants haïtiens francophones, doivent obtenir le CAQ avant la demande à IRCC ; cette étape québécoise a son propre délai.</p>
-<h2>Visites et travail</h2>
-<p>Un visa de visiteur prend ${h.t(tm('visitor', C))}, au ${rankText('visitor', C, 'fr')} pays, après un relevé de ${h.d(vi.max)} le ${h.day(vi.maxDate)}. Les parents et grands-parents peuvent demander le ${h.a('super-visa', 'super visa')}, à ${h.t(tm('super-visa', C))} depuis Haïti, au ${rankText('super-visa', C, 'fr')} pays ; la ligne indiquait ${h.d(sv.first!)} le ${h.day(sv.firstDate!)}. Un permis de travail prend ${h.t(tm('work', C))}, contre ${h.d(wk.first!, 'w')} dans notre plus ancienne copie.</p>
-<h2>Lire l’estimation pour un dossier familial</h2>
-<p>Choisissez la ligne des enfants à charge et le mois où IRCC a reçu le parrainage. L’outil ajoute ${h.t(tm('child', C))} et dit à quelle distance vous êtes de cette date. Avec une ligne aussi longue, un petit changement hebdomadaire du chiffre déplace l’estimation de plusieurs semaines : comparez le résultat avec l’écart au relevé précédent. Dépasser la date n’est pas un refus : un dossier sur cinq prend plus longtemps que le délai publié. À ce moment, vérifiez dans votre compte qu’aucune demande ne vous a échappé, puis utilisez le formulaire Web d’IRCC ; la ${h.a('beyond-processing-time', 'page sur les demandes qui dépassent le délai')} liste les démarches.</p>
-<h2>Haïti et son voisin</h2>
-<p>À la même date, un résident de la République dominicaine attend ${DO('visitor', 'fr')} pour un visa de visiteur, ${DO('study', 'fr')} pour un permis d’études et ${DO('work', 'fr')} pour un permis de travail. Comparer les lignes n’aide que la personne qui réside légalement dans l’autre pays : IRCC applique la ligne du pays d’où l’on dépose.</p>
-<p>Les deux pays n’ont pas la même ligne pour les enfants à charge : la République dominicaine ${K.daysOf(K.readingOf('child', 'DO').t) != null ? `affiche ${K.fmtTime(K.readingOf('child', 'DO').t, 'fr')}` : 'n’a pas de chiffre publié'}, alors qu’Haïti est le plus long des pays chiffrés.</p><h2>Biométrie et lieu de dépôt</h2>
-<p>Chaque demande de visa ou de permis exige une biométrie donnée dans un centre de réception des demandes de visa, et cette attente n’entre pas dans le chiffre d’IRCC. Les Haïtiens qui résident légalement dans un autre pays déposent en général depuis ce pays, et c’est le chiffre de ce pays qui s’applique.</p>
+<h2>La famille d’abord</h2>
+<p>Le Canada compte l’une des plus grandes communautés haïtiennes hors d’Haïti, surtout au Québec, et une grande part des échanges avec IRCC concerne les familles : conjoints, enfants, parents. Le parrainage d’un conjoint ou d’un ${h.a('dependent-child', 'enfant à charge')} vivant en Haïti est traité à l’étranger ; la norme d’IRCC pour ces dossiers familiaux est de ${K.fmtStd(sChild.cur, 'fr')}, tenue pour ${h.pct(sChild.cur.perf)} des demandes à l’échelle du pays en ${K.fmtFy(sChild.fy, 'fr')}. Les documents haïtiens, les examens médicaux et les entrevues peuvent allonger un dossier, qu’IRCC permet de suivre avec ses ${h.src('check-status', 'outils de suivi')}.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'child', c: C, m: 'none' }, t: 'Parrainage d’un enfant depuis Haïti : date de décision estimée' })}
+<p>Recopiez dans le calculateur le délai que l’${h.src('ptimes', 'outil « Vérifier les délais de traitement »')} d’IRCC affiche pour votre type de dossier, et le mois où IRCC l’a reçu. Le résultat est une estimation, pas une date à laquelle IRCC s’engage.</p>
+<h2>Dossiers temporaires : un bond des décisions</h2>
+<p>Les dossiers de résidence temporaire finalisés pour des citoyens haïtiens passent de ${h.n(t24)} en 2024 à ${h.n(t25)} en 2025, ${dirFr(jump)} de ${h.pa(jump)}. Sur les douze derniers mois, IRCC en a finalisé ${h.n(tf.last)} et reçu ${h.n(tin.last)}, et le mois le plus chargé de la série a été ${ext ? h.my(ext.hi[0]) : ''} avec ${h.n(ext?.hi[1] ?? null)} dossiers. La part approuvée parmi les dossiers finalisés est passée de ${h.pct(a.prevRate)} à ${h.pct(a.rate)}. Les retraits comptent parmi les dossiers finalisés : la part est un signal général, pas la probabilité d’obtenir un visa.</p>
+${yearsTable(h, C, ['trIn', 'trFin', 'trOk', 'v1', 'spFin'], 'Citoyens haïtiens par année civile. Source : IRCC, Traitement opérationnel, données ouvertes ; chiffres arrondis à 5.')}
+<p>Les visas de visiteur approuvés pour des citoyens haïtiens s’établissent à ${h.n(v1.last)} en douze mois, ${dirFr(v1.change)} de ${h.pa(v1.change)}. La norme d’IRCC pour un ${h.a('visitor-visa', 'visa de visiteur')} est de ${K.fmtStd(sVis.cur, 'fr')}, tenue pour seulement ${h.pct(sVis.cur.perf)} des demandes à l’échelle du pays en ${K.fmtFy(sVis.fy, 'fr')}. Les parents de résidents canadiens peuvent aussi envisager le ${h.a('super-visa', 'super visa')} pour des séjours plus longs.</p>
+<h2>Études et résidence permanente</h2>
+<p>Les nouvelles demandes de permis d’études finalisées pour des citoyens haïtiens s’établissent à ${h.n(sp.last)} en douze mois, ${dirFr(sp.change)} de ${h.pa(sp.change)}, et ${h.n(st.last)} permis d’études sont entrés en vigueur, ${dirFr(st.change)} de ${h.pa(st.change)}. Les étudiants haïtiens choisissent surtout des établissements francophones du Québec. IRCC a reçu ${h.n(pr.last)} demandes de résidence permanente d’Haïtiens, ${dirFr(pr.change)} de ${h.pa(pr.change)}, et délivré ${h.n(co.last)} autorisations. Entrée express pèse peu : ${h.n(ee)} Haïtiens ont été invités en ${K.EE_FULL}, au ${ord(eeR, 'fr')} rang par citoyenneté. ${h.n(ci.last)} personnes nées en Haïti sont devenues citoyennes canadiennes en douze mois. Les pages ${h.a('cameroon', 'Cameroun')} et ${h.a('france', 'France')} montrent deux profils francophones où les études et Entrée express pèsent davantage.</p>
+<h2>Pays de résidence ou de citoyenneté</h2>
+<p>L’outil d’IRCC rattache les délais au pays depuis lequel vous déposez ; ses données ouvertes comptent des citoyens. Beaucoup d’Haïtiens vivent en République dominicaine, aux États-Unis ou au Chili, et déposent depuis ces pays. Ils lisent la ligne de ce pays dans l’outil, tout en comptant comme Haïtiens dans les volumes ci-dessus.</p>
 `,
   },
 });

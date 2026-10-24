@@ -1,100 +1,87 @@
 import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
+import { extremes } from '../../lib/engine/times';
 
-/* Permis de travail post-diplôme : IRCC ne publie aucune ligne à ce nom. La ligne qui s'applique à un permis
- * demandé au Canada est « permis de travail au Canada » (fichier par pays, code CA). Prolongations à côté. */
-const IN_ = K.readingOf('work-inside');
-const S = IN_.series;
-const tr = K.fullTrend(S)!;
-const pts = K.points(S);
-const ext = K.readingOf('work-ext');
-const past = K.altOf('work-ext')!;
-const pastT = K.fullTrend(past.series)!;
-const studyIn = K.readingOf('study-inside');
-const out = K.readingOf('work', 'IN');
-const D = K.L.dates.country;
-const nRead = K.readingsCount('country');
+/* Chiffres de la page : données ouvertes d'IRCC (titulaires de permis du Programme de mobilité internationale, titulaires
+ * de permis d'études) et normes de service (Inventaire des services du GC), OGL-Canada 2.0, calculés au build. Aucune
+ * norme propre au permis postdiplôme : la page cite celle du permis de travail demandé au Canada. Le délai publié par
+ * IRCC sur canada.ca n'est pas repris : le simulateur prend celui que le lecteur lit dans l'outil d'IRCC. */
 const E = K.en, F = K.fr;
-const wDays = K.daysOf(IN_.t)!;
-const outDays = K.daysOf(out.t)!;
+const pg = K.imp12('pgwp'), imp = K.imp12('all');
+const share = K.pctOf(pg.last, imp.last);
+const ser = K.impSeries('pgwp');
+const hi = extremes(ser, K.IMPD.months).hi!;
+const y = (yr: string) => K.yearSum(ser, K.IMPD.months, yr);
+const p23 = y('2023'), p24 = y('2024'), p25 = y('2025');
+const ins = K.stdOf('work-inside')!;
+const eff = K.study12();
+const ratio = K.pctOf(pg.last, eff.last);
+const dirEn = (x: number | null) => (x == null ? 'about level' : x > 0 ? 'up' : 'down');
+const dirFr = (x: number | null) => (x == null ? 'stable' : x > 0 ? 'en hausse' : 'en baisse');
+if (!(pg.change! > 80 && pg.change! < 110) || !hi[0].startsWith('2026')) throw new Error('pgwp : le texte suppose un bond des permis postdiplôme en 2026');
+if (ins.cur.perf! >= 80) throw new Error('pgwp : le texte suppose la norme du permis de travail au Canada manquée');
 
 export default defineGuide({
   id: 'pgwp', group: 'work', order: 31,
   tool: 'delai', toolArg: { g: 'work-inside', only: 'work-inside,work-ext,study-ext,work' },
   related: ['work-permit', 'work-permit-extension', 'study-permit', 'study-permit-extension', 'cec', 'express-entry'],
-  sources: ['pgwp', 'ptimes-country', 'ptimes-week', 'ptimes-noncountry', 'extend-work', 'ptimes'],
+  sources: ['ptimes', 'od-std', 'od-work', 'od-study', 'pgwp', 'check-status', 'ogl'],
   en: {
     slug: 'pgwp-processing-time',
-    nav: 'Post-graduation work permit', card: 'Which IRCC line applies, time and trend',
-    title: 'PGWP Processing Time: the IRCC Line That Applies, 2026',
-    description: 'PGWP processing time in 2026: IRCC publishes no line under that name, so we show the in-Canada work permit line, its history since 2024 and the extension lines.',
-    h1: 'Post-graduation work permit: which processing time applies',
-    intro: `IRCC’s processing times tool has no entry called PGWP. The line for a work permit requested from inside Canada reads ${K.fmtTime(IN_.t, 'en')} on ${E.day(D)}.`,
-    resume: `There is no published processing time labelled “post-graduation work permit”. IRCC’s tool offers a line called “Work permit in Canada”, which is the one that applies to a first work permit requested from within the country, and on ${E.day(D)} it reads ${K.fmtTime(IN_.t, 'en')}. That line has moved a lot: ${E.d(tr.first!, 'w')} in the oldest copy we hold, dated ${E.day(tr.firstDate!)}, then a low of ${E.d(tr.min, 'w')} on ${E.day(tr.minDate)}, and a rise since. Two other lines matter for graduates who already hold a work permit: the weekly forward-looking time for work permit extensions, ${K.fmtTime(ext.t, 'en')} as of ${E.day(ext.date)}, and the past time for the same extensions, ${K.fmtTime(past.t, 'en')} as of ${E.day(past.date)}. None of these figures is a promise. They count from the day IRCC receives a complete application and exclude biometrics. The tool above lets you switch between the three lines and add the one you choose to your filing date.`,
+    nav: 'Post-graduation work permit', card: 'Decision date from IRCC’s time, PGWPs issued each month, in-Canada standard',
+    title: 'PGWP Processing Time and Your Decision Date in 2026',
+    description: 'Turn the post-graduation work permit time IRCC shows you into a decision date, and see how many PGWPs took effect each month in 2026, from IRCC open data.',
+    h1: 'Post-graduation work permit: your PGWP decision date',
+    intro: `${E.n(pg.last)} post-graduation work permits took effect from ${E.w12(K.IMPD.months)}, ${E.ch(pg.change)} on the twelve months before.`,
+    resume: `IRCC shows the processing time of a post-graduation work permit on its “Check processing times” tool, under work permits requested inside Canada, and that is the figure to copy into the calculator above with the day you submitted your application: you get an estimated decision date. The rest of this page comes from Government of Canada open data under the Open Government Licence of Canada. Over ${E.w12(K.IMPD.months)}, ${E.n(pg.last)} post-graduation work permits took effect, ${E.pct(share)} of all International Mobility Program permits and nearly twice the year before. The busiest month was ${E.my(hi[0])}, with ${E.n(hi[1])}. IRCC has no service standard of its own for this permit; the one for work permits requested inside Canada is ${K.fmtStd(ins.cur, 'en')} for 80% of applications, met for ${E.pct(ins.cur.perf)} of them in ${K.fmtFy(ins.fy, 'en')}.`,
     faqs: [
-      { q: 'Does IRCC publish a PGWP processing time?', a: `Not under that name. The processing times tool and the files behind it have no line labelled post-graduation work permit. The line that covers a work permit requested from inside Canada is the one to use, ${K.fmtTime(IN_.t, 'en')} on ${E.day(D)}. If you apply for the PGWP from outside Canada, the work permit figure for your country of residence would apply instead.` },
-      { q: 'Can I keep working while my PGWP application is processed?', a: 'IRCC sets out on its page about working after graduation when a graduate may work while the decision is pending. The conditions depend on when you applied, whether your study permit was still valid and the rules in force at that time, so read that page for your own dates rather than relying on a general answer.' },
-      { q: 'Why did the PGWP line drop so far between 2024 and 2026?', a: `The in-Canada work permit line read ${E.d(tr.first!, 'w')} in the ${E.day(tr.firstDate!)} copy and ${E.d(pts[1].v, 'w')} in the ${E.day(pts[1].date)} copy. We have no archived copy between ${E.day(pts[1].date)} and ${E.day(pts[2].date)}, so we cannot say when the fall happened, only that the next readings were much lower.` },
-      { q: 'Is a PGWP an extension of my study permit for processing purposes?', a: 'No. A post-graduation work permit is a new permit, not an extension of the study permit. The weekly extension queue applies to people who already hold a work permit and ask for more time on it. That is why this page treats the in-Canada work permit line as the reference for a first PGWP.' },
+      { q: 'Can I work while my PGWP application is processed?', a: 'Yes, if you applied before your study permit expired and you meet the conditions for working off campus. You can then work full time until IRCC decides. If your study permit expired first, you must restore your status as a student before you can work.' },
+      { q: 'How many post-graduation work permits does IRCC issue?', a: `Over ${E.w12(K.IMPD.months)}, ${E.n(pg.last)} took effect, against ${E.n(pg.prev)} the twelve months before. By calendar year, the count was ${E.n(p23)} in 2023, ${E.n(p24)} in 2024 and ${E.n(p25)} in 2025, according to IRCC’s open data on International Mobility Program work permit holders.` },
+      { q: 'Is there a service standard for the PGWP?', a: `Not a separate one. The Government of Canada service inventory, published as open data, gives ${K.fmtStd(ins.cur, 'en')} for work permits requested inside Canada, the line that covers the PGWP. IRCC met it for ${E.pct(ins.cur.perf)} of ${E.n(ins.cur.total)} applications in ${K.fmtFy(ins.fy, 'en')}, against ${E.pct(ins.prev?.perf)} the year before.` },
     ],
     body: (h) => `
-<h2>The line IRCC actually publishes</h2>
-<p>IRCC publishes its processing times as several data files. In the file by country, the work permit has one figure per country of residence plus one entry under the code for Canada, which the public tool displays as a work permit requested from inside Canada. That entry, ${h.t(IN_.t)} on ${h.day(D)}, is what a graduate applying online from inside the country should look at. Searching the tool for “PGWP” or “post-graduation” returns nothing, and we do not invent a separate figure.</p>
-<p>For comparison, a work permit requested from India reads ${h.t(out.t)} on the same date, and a study permit requested from inside Canada reads ${h.t(studyIn.t)}. The in-Canada work permit line is ${wDays > outDays ? 'longer' : 'shorter'} than the India figure by about ${h.n(Math.round(Math.abs(wDays - outDays) / 7))} weeks, which is worth knowing for graduates who could in theory apply from either place.</p>
-<h2>History of the in-Canada work permit line</h2>
-${h.hist(S, { unit: 'w', max: 12 })}
-<p>The archive behind this table is thin. The file by country exists in only ${h.n(nRead)} dated copies: ${h.day(pts[0].date)}, ${h.day(pts[1].date)}, and then a sequence that starts on ${h.day(pts[2].date)}. More than a year passes without any copy, so the table cannot show what happened in between. What it shows clearly is the scale of the change: from ${h.d(tr.first!, 'w')} to ${h.d(tr.min, 'w')}, and then a climb back to ${h.t(IN_.t)}, with a peak since July of ${h.d(Math.max(...pts.slice(2).map((p) => p.v)), 'w')}.</p>
-<p>The recent climb matters more than the old figures for anyone applying this autumn. Graduations in spring and summer bring many applications at once, and a past-time measure reports them only as they are decided. A figure that has risen over several readings in a row tends to stay high for a while.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'work-inside', m: 'none' }, t: 'Your permit after graduation: estimated decision date' })}
-<h2>When the extension lines apply instead</h2>
-<p>Graduates who already hold a work permit, for example a spouse’s open permit or an earlier permit, and who ask to extend it fall under the extension figures. IRCC publishes two of them, measured differently:</p>
-${h.table(['Line', 'Figure', 'IRCC date', 'Kind of measure'], [
-  [h.a('work-permit-extension', 'Work permit extension, weekly queue'), h.t(ext.t), h.day(ext.date), 'Forward-looking'],
-  ['Work permit extension, past time', h.t(past.t), h.day(past.date), '80% of recent decisions'],
-  ['Work permit, inside Canada', h.t(IN_.t), h.day(D), '80% of recent decisions'],
-], 'Lines that can apply to a graduate in Canada.', ['l', 'r', 'r', 'l'])}
-<p>The past extension figure peaked at ${h.d(pastT.max)} on ${h.day(pastT.maxDate)}. The weekly queue, by contrast, has only been archived since ${h.day(K.firstReading('tr'))}, which makes it a short series of ${h.n(K.readingsCount('tr'))} readings: too few to call a trend.</p>
-<h2>Practical points for graduates</h2>
-<p>Apply before your study permit expires if you want to remain in Canada while waiting; IRCC’s page on ${h.src('pgwp', 'working after graduation')} lists the deadlines that count from the date your school confirms you completed your program, and the conditions for working during processing. Keep the confirmation of submission: the date on it is the date to enter in the tool. If IRCC asks for a document, such as a transcript or a passport scan, the file waits for your reply and the published time does not cover that pause.</p>
-<p>Biometrics are a separate point. Many graduates gave fingerprints when they applied for their study permit, and IRCC reuses them while they remain valid; if yours have expired, the appointment comes on top of the published time. The same applies to a medical exam, when IRCC asks for one.</p>
-<p>A PGWP is often the step before permanent residence through the ${h.a('cec', 'Canadian Experience Class')}. Work experience counts only once you are authorized to work, so the date of the permit decision has a direct effect on when you can reach the year of experience that the class requires.</p>
+<h2>From the time IRCC shows to a date</h2>
+<p>A post-graduation work permit is almost always requested from inside Canada, online, after your school confirms you completed the program. IRCC’s ${h.src('ptimes', '“Check processing times” tool')} lists it under work permits requested inside Canada, with a figure in days. This site does not copy that figure. Read it on IRCC’s tool, enter it in the calculator, and add the day you submitted the application. The calculator gives the estimated decision date and the days left or already past.</p>
+<p>You have 180 days after your school confirms you completed your program to apply, provided you held a valid study permit at some point during those 180 days. The decision date does not change that deadline: apply as soon as your final transcript or completion letter is available. A permit is issued once in a lifetime, and its length follows the length of your program, so a short program gives a short permit.</p>
+${h.mini('delai', { p: ['n', 'm', 'd'], d: { g: 'work-inside' }, t: 'Your PGWP: estimated decision date' })}
+<h2>Your status while you wait</h2>
+<p>If your study permit was still valid on the day you applied, you keep your status while IRCC decides and, if you were eligible to work off campus, you can work full time. The ${h.src('check-status', 'application status tracker')} shows whether IRCC has asked for biometrics or a document. Leaving Canada while you wait ends the right to work until the permit is issued. The ${h.src('pgwp', 'eligibility rules')} also changed in 2024, with field of study and language requirements for many programs: check them before you file.</p>
+<h2>PGWPs that took effect, month by month</h2>
+<p>IRCC’s ${h.src('od-work', 'work permit holders data')} counts the post-graduation work permits that took effect each month. Over the latest twelve months, ${h.n(pg.last)} did, ${dirEn(pg.change)} ${h.pa(pg.change)} on the year before, and ${h.pct(share)} of all International Mobility Program permits. The busiest month in the series was ${h.my(hi[0])}, with ${h.n(hi[1])} permits. The open data shows the jump but not its cause: it can reflect a larger cohort finishing studies, a faster pace of decisions, or both. By calendar year, the count was ${h.n(p23)} in 2023, ${h.n(p24)} in 2024 and ${h.n(p25)} in 2025.</p>
+${h.months(K.IMPD.months, [['Post-graduation work permits', ser]], { max: 24, caption: 'Post-graduation work permits that took effect, by month, newest first. Source: IRCC open data, International Mobility Program work permit holders; figures rounded to 5.' })}
+<h2>From student to graduate</h2>
+<p>The pipeline starts with study permits. Over the same twelve months, ${h.n(eff.last)} study permits took effect, from the ${h.src('od-study', 'study permit holders dataset')}, so post-graduation work permits issued were equal to ${h.pct(ratio)} of the study permits that started. The two counts do not cover the same people, since a PGWP comes years after a study permit, but the gap shows how much of the current flow is graduates of the larger cohorts admitted before the 2024 cap.</p>
+<h2>The in-Canada work permit standard</h2>
+<p>The Government of Canada service inventory, published as ${h.src('od-std', 'open data')}, has no line for the PGWP alone. It covers it in the work permit requested inside Canada: ${K.fmtStd(ins.cur, 'en')} for 80% of applications. In ${K.fmtFy(ins.fy, 'en')}, IRCC met it for ${h.n(ins.cur.met)} of ${h.n(ins.cur.total)} applications, ${h.pct(ins.cur.perf)}, against ${h.pct(ins.prev?.perf)} the year before. That is short of the 80% target, so a file that runs past the time on IRCC’s tool is not unusual. If yours does, see the ${h.a('beyond-processing-time', 'steps for an application past the processing time')}. Once you hold the permit, a year of skilled work can lead to the ${h.a('cec', 'Canadian Experience Class')} through ${h.a('express-entry', 'Express Entry')}.</p>
 `,
   },
   fr: {
     slug: 'delai-permis-post-diplome',
-    nav: 'Permis post-diplôme', card: 'La ligne d’IRCC qui s’applique, délai et tendance',
-    title: 'Délai du permis post-diplôme (PTPD) : la bonne ligne, 2026',
-    description: 'Délai 2026 du permis de travail post-diplôme : aucune ligne d’IRCC à ce nom ; voici celle du permis demandé au Canada, son historique et les prolongations.',
-    h1: 'Permis de travail post-diplôme : quel délai s’applique',
-    intro: `L’outil d’IRCC n’a aucune entrée appelée permis post-diplôme. La ligne du permis de travail demandé au Canada indique ${K.fmtTime(IN_.t, 'fr')} au ${F.day(D)}.`,
-    resume: `Aucun délai publié ne porte le nom de permis de travail post-diplôme (PTPD). L’outil d’IRCC propose une ligne « permis de travail, demande au Canada », celle qui s’applique à un premier permis de travail demandé sur place, et elle indique ${K.fmtTime(IN_.t, 'fr')} au ${F.day(D)}. Cette ligne a beaucoup bougé : ${F.d(tr.first!, 'w')} dans la plus ancienne copie conservée, datée du ${F.day(tr.firstDate!)}, puis un creux à ${F.d(tr.min, 'w')} le ${F.day(tr.minDate)}, et une remontée depuis. Deux autres lignes concernent les diplômés qui ont déjà un permis de travail : le délai prospectif hebdomadaire des prolongations, ${K.fmtTime(ext.t, 'fr')} au ${F.day(ext.date)}, et le délai passé des mêmes prolongations, ${K.fmtTime(past.t, 'fr')} au ${F.day(past.date)}. Aucun de ces chiffres n’est une promesse : ils comptent depuis la réception d’une demande complète et excluent la biométrie. L’outil permet de passer d’une ligne à l’autre et d’ajouter celle qui vous concerne à votre date de dépôt.`,
+    nav: 'Permis post-diplôme', card: 'Date de décision à partir du délai d’IRCC, permis délivrés chaque mois, norme au Canada',
+    title: 'Délai du permis de travail postdiplôme (PTPD) en 2026',
+    description: 'Transformez le délai du permis de travail postdiplôme affiché par IRCC en date de décision et voyez combien de PTPD entrent en vigueur chaque mois en 2026.',
+    h1: 'Permis de travail postdiplôme : votre date de décision',
+    intro: `${F.n(pg.last)} permis de travail postdiplôme sont entrés en vigueur de ${F.w12(K.IMPD.months)}, soit ${F.ch(pg.change)} par rapport aux douze mois d’avant.`,
+    resume: `IRCC affiche le délai de traitement du permis de travail postdiplôme dans son outil « Vérifier les délais de traitement », parmi les permis de travail demandés au Canada : c’est ce chiffre qu’il faut recopier dans le calculateur ci-dessus avec le jour d’envoi de la demande pour obtenir une date de décision estimée. Le reste de la page vient des données ouvertes du gouvernement du Canada, sous la Licence du gouvernement ouvert du Canada. De ${F.w12(K.IMPD.months)}, ${F.n(pg.last)} permis de travail postdiplôme sont entrés en vigueur, soit ${F.pct(share)} de tous les permis du Programme de mobilité internationale et presque deux fois plus qu’un an plus tôt. Le mois le plus chargé a été ${F.my(hi[0])}, avec ${F.n(hi[1])} permis. IRCC n’a pas de norme de service propre à ce permis ; celle du permis de travail demandé au Canada est de ${K.fmtStd(ins.cur, 'fr')} pour 80 % des demandes, tenue pour ${F.pct(ins.cur.perf)} d’entre elles en ${K.fmtFy(ins.fy, 'fr')}.`,
     faqs: [
-      { q: 'IRCC publie-t-il un délai pour le permis post-diplôme ?', a: `Pas sous ce nom. L’outil des délais et les fichiers qui l’alimentent n’ont aucune ligne intitulée permis de travail post-diplôme. La ligne à utiliser est celle du permis de travail demandé au Canada, ${K.fmtTime(IN_.t, 'fr')} au ${F.day(D)}. Si vous demandez ce permis depuis l’étranger, c’est le chiffre du permis de travail de votre pays de résidence qui s’applique.` },
-      { q: 'Puis-je travailler pendant le traitement de mon permis post-diplôme ?', a: 'IRCC précise sur sa page consacrée au travail après les études dans quels cas un diplômé peut travailler pendant l’attente. Les conditions dépendent de la date de votre demande, de la validité de votre permis d’études à ce moment et des règles alors en vigueur : lisez cette page avec vos propres dates plutôt qu’une réponse générale.' },
-      { q: 'Pourquoi le délai du permis post-diplôme a-t-il autant baissé entre 2024 et 2026 ?', a: `La ligne du permis de travail demandé au Canada indiquait ${F.d(tr.first!, 'w')} dans la copie du ${F.day(tr.firstDate!)} et ${F.d(pts[1].v, 'w')} dans celle du ${F.day(pts[1].date)}. Aucune copie archivée n’existe entre le ${F.day(pts[1].date)} et le ${F.day(pts[2].date)} : on ne peut pas dater la baisse, seulement constater que les relevés suivants sont bien plus bas.` },
-      { q: 'Le permis post-diplôme est-il traité comme une prolongation du permis d’études ?', a: 'Non. Le permis de travail post-diplôme est un nouveau permis, pas la prolongation du permis d’études. La file hebdomadaire des prolongations vise les personnes qui ont déjà un permis de travail et demandent plus de temps. C’est pourquoi cette page prend la ligne du permis de travail demandé au Canada comme référence pour un premier permis post-diplôme.' },
+      { q: 'Puis-je travailler pendant le traitement de ma demande de PTPD ?', a: 'Oui, si vous avez fait la demande avant l’expiration de votre permis d’études et que vous remplissiez les conditions pour travailler hors campus. Vous pouvez alors travailler à temps plein jusqu’à la décision d’IRCC. Si votre permis d’études a expiré avant, il faut d’abord rétablir votre statut d’étudiant pour pouvoir travailler.' },
+      { q: 'Combien de permis de travail postdiplôme IRCC délivre-t-il ?', a: `De ${F.w12(K.IMPD.months)}, ${F.n(pg.last)} sont entrés en vigueur, contre ${F.n(pg.prev)} les douze mois d’avant. Par année civile, on en compte ${F.n(p23)} en 2023, ${F.n(p24)} en 2024 et ${F.n(p25)} en 2025, d’après les données ouvertes d’IRCC sur les titulaires de permis du Programme de mobilité internationale.` },
+      { q: 'Existe-t-il une norme de service pour le PTPD ?', a: `Pas de norme distincte. L’inventaire des services du gouvernement du Canada, publié en données ouvertes, fixe ${K.fmtStd(ins.cur, 'fr')} pour les permis de travail demandés au Canada, la ligne qui couvre le PTPD. IRCC l’a tenue pour ${F.pct(ins.cur.perf)} des ${F.n(ins.cur.total)} demandes en ${K.fmtFy(ins.fy, 'fr')}, contre ${F.pct(ins.prev?.perf)} l’exercice d’avant.` },
     ],
     body: (h) => `
-<h2>La ligne qu’IRCC publie vraiment</h2>
-<p>IRCC publie ses délais dans plusieurs fichiers de données. Dans le fichier par pays, le permis de travail a un chiffre par pays de résidence, plus une entrée sous le code du Canada, que l’outil public affiche comme permis de travail demandé au Canada. C’est cette entrée, ${h.t(IN_.t)} au ${h.day(D)}, qu’un diplômé qui dépose en ligne depuis le Canada doit regarder. Chercher « PTPD » ou « post-diplôme » dans l’outil ne donne rien, et nous n’inventons pas de chiffre à part.</p>
-<p>Pour comparer, un permis de travail demandé depuis l’Inde affiche ${h.t(out.t)} à la même date, et un permis d’études demandé au Canada ${h.t(studyIn.t)}. La ligne du permis de travail au Canada est ${wDays > outDays ? 'plus longue' : 'plus courte'} que le chiffre de l’Inde d’environ ${h.n(Math.round(Math.abs(wDays - outDays) / 7))} semaines, ce qui intéresse les diplômés qui pourraient en principe déposer d’un endroit ou de l’autre.</p>
-<h2>Historique de la ligne du permis de travail au Canada</h2>
-${h.hist(S, { unit: 'w', max: 12 })}
-<p>L’archive derrière ce tableau est mince. Le fichier par pays n’existe qu’en ${h.n(nRead)} copies datées : ${h.day(pts[0].date)}, ${h.day(pts[1].date)}, puis une suite qui commence le ${h.day(pts[2].date)}. Plus d’un an passe sans aucune copie : le tableau ne peut pas montrer ce qui s’est passé entre-temps. Il montre en revanche l’ampleur du changement, de ${h.d(tr.first!, 'w')} à ${h.d(tr.min, 'w')}, puis une remontée jusqu’à ${h.t(IN_.t)}, avec un sommet depuis juillet de ${h.d(Math.max(...pts.slice(2).map((p) => p.v)), 'w')}.</p>
-<p>Pour qui dépose cet automne, la remontée récente compte plus que les vieux chiffres. Les fins de programme du printemps et de l’été amènent beaucoup de demandes en même temps, et un délai passé ne les reflète qu’au moment où elles sont tranchées. Un chiffre qui a monté plusieurs relevés de suite reste en général haut quelque temps.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'work-inside', m: 'none' }, t: 'Votre permis après les études : date de décision estimée' })}
-<h2>Quand les lignes de prolongation s’appliquent</h2>
-<p>Les diplômés qui ont déjà un permis de travail, par exemple un permis ouvert d’époux ou un permis antérieur, et qui demandent à le prolonger relèvent des chiffres de prolongation. IRCC en publie deux, mesurés autrement :</p>
-${h.table(['Ligne', 'Chiffre', 'Date IRCC', 'Type de mesure'], [
-  [h.a('work-permit-extension', 'Prolongation du permis de travail, file hebdomadaire'), h.t(ext.t), h.day(ext.date), 'Prospectif'],
-  ['Prolongation du permis de travail, délai passé', h.t(past.t), h.day(past.date), '80 % des décisions récentes'],
-  ['Permis de travail, demande au Canada', h.t(IN_.t), h.day(D), '80 % des décisions récentes'],
-], 'Lignes qui peuvent concerner un diplômé au Canada.', ['l', 'r', 'r', 'l'])}
-<p>Le délai passé des prolongations a culminé à ${h.d(pastT.max)} le ${h.day(pastT.maxDate)}. La file hebdomadaire, elle, n’est archivée que depuis le ${h.day(K.firstReading('tr'))} : une série courte de ${h.n(K.readingsCount('tr'))} relevés, trop peu pour parler de tendance.</p>
-<h2>Points pratiques pour les diplômés</h2>
-<p>Déposez avant l’expiration de votre permis d’études si vous voulez rester au Canada pendant l’attente ; la page d’IRCC sur le ${h.src('pgwp', 'travail après les études')} donne les échéances, comptées à partir de la confirmation de fin de programme par l’établissement, et les conditions pour travailler pendant le traitement. Gardez la confirmation d’envoi : sa date est celle à indiquer dans l’outil. Si IRCC demande un document, comme un relevé de notes ou une copie du passeport, le dossier attend votre réponse et le délai publié ne couvre pas cette pause.</p>
-<p>La biométrie est un point à part. Beaucoup de diplômés ont donné leurs empreintes pour leur permis d’études, et IRCC les réutilise tant qu’elles restent valides ; si les vôtres ont expiré, le rendez-vous s’ajoute au délai publié. Il en va de même d’un examen médical, quand IRCC en demande un.</p>
-<p>Le permis post-diplôme précède souvent la résidence permanente par la ${h.a('cec', 'catégorie de l’expérience canadienne')}. L’expérience de travail ne compte qu’une fois l’autorisation de travailler obtenue : la date de décision du permis pèse donc directement sur le moment où vous atteignez l’année d’expérience exigée.</p>
+<h2>Du délai affiché par IRCC à une date</h2>
+<p>Le permis de travail postdiplôme se demande presque toujours depuis le Canada, en ligne, une fois que l’établissement a confirmé la fin du programme. L’${h.src('ptimes', 'outil « Vérifier les délais de traitement »')} d’IRCC le range parmi les permis de travail demandés au Canada, avec un chiffre en jours. Ce site ne recopie pas ce chiffre. Lisez-le dans l’outil d’IRCC, saisissez-le dans le calculateur et indiquez le jour d’envoi de la demande. Le calculateur donne la date de décision estimée et les jours restants ou déjà dépassés.</p>
+<p>Vous avez 180 jours après la confirmation de fin de programme pour faire la demande, à condition d’avoir eu un permis d’études valide à un moment de ces 180 jours. La date de décision ne change rien à ce délai : déposez dès que le relevé de notes final ou la lettre de fin d’études est disponible.</p>
+${h.mini('delai', { p: ['n', 'm', 'd'], d: { g: 'work-inside' }, t: 'Votre PTPD : date de décision estimée' })}
+<h2>Votre statut pendant l’attente</h2>
+<p>Si votre permis d’études était encore valide le jour de la demande, vous gardez votre statut pendant la décision d’IRCC et, si vous pouviez travailler hors campus, vous pouvez travailler à temps plein. L’${h.src('check-status', 'outil de suivi des demandes')} indique si IRCC a demandé la biométrie ou un document. Quitter le Canada pendant l’attente met fin au droit de travailler jusqu’à la délivrance du permis. Les ${h.src('pgwp', 'conditions d’admissibilité')} ont aussi changé en 2024, avec des exigences de domaine d’études et de langue pour de nombreux programmes : vérifiez-les avant de déposer.</p>
+<h2>Les PTPD entrés en vigueur, mois par mois</h2>
+<p>Les ${h.src('od-work', 'données des titulaires de permis de travail')} d’IRCC comptent les permis de travail postdiplôme entrés en vigueur chaque mois. Sur les douze derniers mois, ${h.n(pg.last)} l’ont été, ${dirFr(pg.change)} de ${h.pa(pg.change)} sur un an, soit ${h.pct(share)} de tous les permis du Programme de mobilité internationale. Le mois le plus chargé de la série a été ${h.my(hi[0])}, avec ${h.n(hi[1])} permis. Les données ouvertes montrent le bond, pas sa cause : une cohorte plus nombreuse qui termine ses études, un rythme de décision plus rapide, ou les deux. Par année civile, on en compte ${h.n(p23)} en 2023, ${h.n(p24)} en 2024 et ${h.n(p25)} en 2025.</p>
+${h.months(K.IMPD.months, [['Permis de travail postdiplôme', ser]], { max: 24, caption: 'Permis de travail postdiplôme entrés en vigueur, par mois, du plus récent au plus ancien. Source : IRCC, données ouvertes, titulaires de permis du Programme de mobilité internationale ; chiffres arrondis à 5.' })}
+<h2>De l’étudiant au diplômé</h2>
+<p>Tout part des permis d’études. Sur les mêmes douze mois, ${h.n(eff.last)} permis d’études sont entrés en vigueur d’après le ${h.src('od-study', 'jeu des titulaires de permis d’études')} : les permis postdiplôme délivrés représentent donc ${h.pct(ratio)} des permis d’études qui ont commencé. Les deux chiffres ne visent pas les mêmes personnes, puisqu’un PTPD vient des années après un permis d’études, mais l’écart montre la part du flux actuel qui vient des grandes cohortes admises avant le plafond de 2024.</p>
+<h2>La norme du permis de travail demandé au Canada</h2>
+<p>L’inventaire des services du gouvernement du Canada, publié en ${h.src('od-std', 'données ouvertes')}, n’a pas de ligne pour le seul PTPD. Il le compte dans le permis de travail demandé au Canada : ${K.fmtStd(ins.cur, 'fr')} pour 80 % des demandes. En ${K.fmtFy(ins.fy, 'fr')}, IRCC l’a tenue pour ${h.n(ins.cur.met)} demandes sur ${h.n(ins.cur.total)}, soit ${h.pct(ins.cur.perf)}, contre ${h.pct(ins.prev?.perf)} l’exercice d’avant. C’est en dessous de la cible de 80 % : un dossier qui dépasse le délai de l’outil d’IRCC n’a rien d’exceptionnel. Dans ce cas, voyez les ${h.a('beyond-processing-time', 'démarches pour une demande qui dépasse le délai')}. Une fois le permis obtenu, un an de travail qualifié peut ouvrir la ${h.a('cec', 'catégorie de l’expérience canadienne')} par ${h.a('express-entry', 'Entrée express')}.</p>
 `,
   },
 });

@@ -1,7 +1,7 @@
 {
-  "_lisezmoi": "Paramètres et sources du site (RECETTE-SITE.md §4). Les délais eux-mêmes ne sont pas ici : ils viennent des fichiers publiés par IRCC, relus par scripts/ircc/update-data.mjs (src/data/ircc/). Ici : la règle de présence physique de la citoyenneté et la liste des sources citées. Relu sur les pages officielles le 2026-10-21.",
+  "_lisezmoi": "Paramètres et sources du site (RECETTE-SITE.md §4). Les volumes viennent des jeux de données ouverts d'IRCC publiés sur open.canada.ca sous la Licence du gouvernement ouvert – Canada (OGL-Canada 2.0), relus par scripts/ircc/update-data.mjs (src/data/ogl/). Les délais publiés sur canada.ca ne sont pas repris (Avis du gouvernement du Canada : reproduction non commerciale) ; les pages renvoient à l'outil d'IRCC. Ici : la règle de présence physique de la citoyenneté et la liste des sources citées. Relu le 2026-10-23.",
   "year": 2026,
-  "retrieved_at": "2026-10-21",
+  "retrieved_at": "2026-10-23",
   "valid_from": "2026-01-01",
   "valid_to": "2026-12-31",
   "citizenship": {
@@ -20,47 +20,12 @@
         "en": "IRCC: Check processing times"
       }
     },
-    "ptimes-country": {
-      "url": "https://www.canada.ca/content/dam/ircc/documents/json/data-ptime-en.json",
-      "label": {
-        "fr": "IRCC : fichier des délais par pays (data-ptime-en.json)",
-        "en": "IRCC: processing times by country file (data-ptime-en.json)"
-      }
-    },
-    "ptimes-noncountry": {
-      "url": "https://www.canada.ca/content/dam/ircc/documents/json/data-ptime-non-country-en.json",
-      "label": {
-        "fr": "IRCC : fichier des délais sans pays (data-ptime-non-country-en.json)",
-        "en": "IRCC: processing times file, not by country (data-ptime-non-country-en.json)"
-      }
-    },
-    "ptimes-flpt": {
-      "url": "https://www.canada.ca/content/dam/ircc/documents/json/flpt-en.json",
-      "label": {
-        "fr": "IRCC : délais prospectifs, résidence permanente et citoyenneté (flpt-en.json)",
-        "en": "IRCC: forward-looking times, permanent residence and citizenship (flpt-en.json)"
-      }
-    },
-    "ptimes-week": {
-      "url": "https://www.canada.ca/content/dam/ircc/documents/json/flpt-by-week-en.json",
-      "label": {
-        "fr": "IRCC : délais prospectifs par semaine, prolongations de permis (flpt-by-week-en.json)",
-        "en": "IRCC: forward-looking times by week, permit extensions (flpt-by-week-en.json)"
-      }
-    },
     "ee-rounds": {
       "url": "https://www.canada.ca/fr/immigration-refugies-citoyennete/services/immigrer-canada/entree-express/rondes-invitations.html",
       "url_en": "https://www.canada.ca/en/immigration-refugees-citizenship/services/immigrate-canada/express-entry/rounds-invitations.html",
       "label": {
         "fr": "IRCC : Rondes d’invitations d’Entrée express",
         "en": "IRCC: Express Entry rounds of invitations"
-      }
-    },
-    "ee-data": {
-      "url": "https://www.canada.ca/content/dam/ircc/documents/json/ee_rounds_123_en.json",
-      "label": {
-        "fr": "IRCC : fichier des rondes d’Entrée express (ee_rounds_123_en.json)",
-        "en": "IRCC: Express Entry rounds file (ee_rounds_123_en.json)"
       }
     },
     "express-entry": {
@@ -270,15 +235,56 @@
       "url": "https://open.canada.ca/data/fr/dataset/9b34e712-513f-44e9-babf-9df4f7256550",
       "url_en": "https://open.canada.ca/data/en/dataset/9b34e712-513f-44e9-babf-9df4f7256550",
       "label": {
-        "fr": "Gouvernement ouvert : Traitement opérationnel, mises à jour mensuelles d’IRCC",
-        "en": "Open Government: Operational Processing, Monthly IRCC Updates"
+        "fr": "IRCC, données ouvertes : Traitement opérationnel, mises à jour mensuelles",
+        "en": "IRCC open data: Operational Processing, Monthly IRCC Updates"
       }
     },
-    "wayback": {
-      "url": "https://web.archive.org/web/*/https://www.canada.ca/content/dam/ircc/documents/json/*",
+    "od-pr": {
+      "url": "https://open.canada.ca/data/fr/dataset/f7e5498e-0ad8-4417-85c9-9b8aff9b9eda",
+      "url_en": "https://open.canada.ca/data/en/dataset/f7e5498e-0ad8-4417-85c9-9b8aff9b9eda",
       "label": {
-        "fr": "Internet Archive : captures des fichiers IRCC (Wayback Machine)",
-        "en": "Internet Archive: captures of the IRCC files (Wayback Machine)"
+        "fr": "IRCC, données ouvertes : Résidents permanents, mises à jour mensuelles",
+        "en": "IRCC open data: Permanent Residents, Monthly IRCC Updates"
+      }
+    },
+    "od-ee": {
+      "url": "https://open.canada.ca/data/fr/dataset/593e9165-c6ce-4f9b-b519-03d315f92cd4",
+      "url_en": "https://open.canada.ca/data/en/dataset/593e9165-c6ce-4f9b-b519-03d315f92cd4",
+      "label": {
+        "fr": "IRCC, données ouvertes : Entrée express, candidats invités",
+        "en": "IRCC open data: Express Entry invited candidates"
+      }
+    },
+    "od-work": {
+      "url": "https://open.canada.ca/data/fr/dataset/360024f2-17e9-4558-bfc1-3616485d65b9",
+      "url_en": "https://open.canada.ca/data/en/dataset/360024f2-17e9-4558-bfc1-3616485d65b9",
+      "label": {
+        "fr": "IRCC, données ouvertes : titulaires de permis de travail (PTET et PMI)",
+        "en": "IRCC open data: TFWP and IMP work permit holders"
+      }
+    },
+    "od-study": {
+      "url": "https://open.canada.ca/data/fr/dataset/90115b00-f9b8-49e8-afa3-b4cff8facaee",
+      "url_en": "https://open.canada.ca/data/en/dataset/90115b00-f9b8-49e8-afa3-b4cff8facaee",
+      "label": {
+        "fr": "IRCC, données ouvertes : titulaires de permis d’études",
+        "en": "IRCC open data: study permit holders"
+      }
+    },
+    "ogl": {
+      "url": "https://ouvert.canada.ca/fr/licence-du-gouvernement-ouvert-canada",
+      "url_en": "https://open.canada.ca/en/open-government-licence-canada",
+      "label": {
+        "fr": "Licence du gouvernement ouvert – Canada",
+        "en": "Open Government Licence – Canada"
+      }
+    },
+    "od-std": {
+      "url": "https://ouvert.canada.ca/data/fr/dataset/3ac0d080-6149-499a-8b06-7ce5f00ec56c",
+      "url_en": "https://open.canada.ca/data/en/dataset/3ac0d080-6149-499a-8b06-7ce5f00ec56c",
+      "label": {
+        "fr": "Inventaire des services du GC : normes de service et résultats",
+        "en": "GC Service Inventory: service standards and performance results"
       }
     }
   }

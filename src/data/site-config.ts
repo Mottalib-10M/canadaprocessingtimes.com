@@ -8,14 +8,14 @@ export const CURRENCY = 'CAD';
 export const YEAR = 2026;
 /** Année de création du site — signal d'ancienneté (RECETTE §8.0). */
 export const SITE_FOUNDED = '2026';
-export const LAST_UPDATED = '2026-10-21';
+export const LAST_UPDATED = '2026-09-01';
 export const AUTHOR_NAME = 'Radif Partners';
-export const AUTHOR_ROLE: Record<string, string> = {"en": "Independent publisher that archives Canadian immigration processing times every week and turns them into estimated decision dates and trends", "fr": "Éditeur indépendant qui archive chaque semaine les délais de traitement de l'immigration canadienne et en tire des dates de décision estimées et des tendances"};
-export const AUTHOR_DESC: Record<string, string> = {"en": "Radif Partners reads the processing times that IRCC publishes for each application type and country of filing, keeps a dated copy of every reading, and turns the figures into what an applicant actually asks: the date a decision could come if the published time holds, whether that time is rising or falling, and how a country compares with the others. Nothing is sold, no consultant is recommended and no contact detail is ever asked for.", "fr": "Radif Partners relit les délais qu'IRCC publie pour chaque type de demande et chaque pays de dépôt, garde une copie datée de chaque relevé et en tire ce que le demandeur veut savoir : la date à laquelle une décision pourrait arriver si le délai publié se maintient, le sens de la tendance et la place de son pays parmi les autres. Rien n'est vendu, aucun consultant n'est recommandé et aucune coordonnée n'est demandée."};
+export const AUTHOR_ROLE: Record<string, string> = {"en": "Independent publisher that turns Canadian immigration processing times into estimated decision dates, with IRCC service standards and open data", "fr": "Éditeur indépendant qui transforme les délais de traitement de l'immigration canadienne en dates de décision estimées, avec les normes de service et les données ouvertes d'IRCC"};
+export const AUTHOR_DESC: Record<string, string> = {"en": "Radif Partners builds calculators from Government of Canada open data. For IRCC applications, it turns the processing time a reader copies from IRCC's tool into an estimated decision date, and sets it next to IRCC's service standards and the volumes IRCC publishes each month: applications received and decided, permits, permanent residents and new citizens. Nothing is sold, no consultant is recommended and no contact detail is ever asked for.", "fr": "Radif Partners construit des calculateurs à partir des données ouvertes du gouvernement du Canada. Pour les demandes à IRCC, il transforme le délai que le lecteur copie dans l'outil d'IRCC en date de décision estimée, et le place à côté des normes de service d'IRCC et des volumes qu'IRCC publie chaque mois : demandes reçues et tranchées, permis, résidents permanents et nouveaux citoyens. Rien n'est vendu, aucun consultant n'est recommandé et aucune coordonnée n'est demandée."};
 /** Sujets sur lesquels l'editeur est competent (schema.org knowsAbout). Ce sont les
  *  themes reellement traites par le site, pas une liste de mots-cles : un sujet
  *  declare ici sans page qui le couvre est une declaration fausse. */
-export const KNOWS_ABOUT: Record<string, string[]> = {"en": ["IRCC processing times", "Visitor visa and study permit processing", "Work permits and post-graduation work permits", "Express Entry rounds of invitations", "Family sponsorship processing", "Canadian citizenship physical presence"], "fr": ["Délais de traitement d'IRCC", "Traitement des visas de visiteur et des permis d'études", "Permis de travail et permis post-diplôme", "Rondes d'invitations d'Entrée express", "Traitement du parrainage familial", "Présence effective pour la citoyenneté canadienne"]};
+export const KNOWS_ABOUT: Record<string, string[]> = {"en": ["IRCC processing times and service standards", "Visitor visa and study permit processing", "Work permits and post-graduation work permits", "Express Entry invitations by score band", "Family sponsorship processing", "Canadian citizenship physical presence"], "fr": ["Délais et normes de service d'IRCC", "Traitement des visas de visiteur et des permis d'études", "Permis de travail et permis post-diplôme", "Invitations d'Entrée express par tranche de score", "Traitement du parrainage familial", "Présence effective pour la citoyenneté canadienne"]};
 export const CONTACT_EMAIL = "contact@canadaprocessingtimes.com";
 export const THEME_COLOR = '#A3122B';
 export const LOGO_SYMBOL = '⧗';
@@ -31,7 +31,7 @@ export const CONSENT_MODE: 'opt-in' | 'notice' | 'none' = 'none';
  *  pages légales régénérées : `python3 scripts/gen-legal-pages.py .`. Vide = pas de GA4. */
 export const GA4_ID = '';
 /** Projet Microsoft Clarity (compte amradif), chargé sans cookie. Vide = aucune mesure. */
-export const CLARITY_ID = '';
+export const CLARITY_ID = 'z260zhaoa1';
 export const INDEXNOW_KEY = '3f276f07b912b288679d21eb53bc3c70';
 
 /* ------------------------------------------------------------------------- *

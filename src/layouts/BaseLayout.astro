@@ -160,6 +160,7 @@ const crumbAside = Astro.slots.has('crumb-aside') ? (await Astro.slots.render('c
             <p><span class="inline-flex items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 py-0.5 text-xs font-medium text-green-700"><span class="inline-block h-1.5 w-1.5 rounded-full bg-green-500" aria-hidden="true"></span>{ui.footerValidated} · {YEAR}</span></p>
             <p>{ui.footerBrowser}</p>
             <p>{ui.asOf} {YEAR}, {ui.lastUpdated} <time datetime={LAST_UPDATED}>{displayDate(LAST_UPDATED, LANG_TAGS[lang])}</time></p>
+            <p data-ogl>{ui.oglText} <a href={ui.oglHref} rel="license noopener" target="_blank" class="underline hover:text-navy-900">{ui.oglName}</a>.</p>
             <p>&copy; {new Date().getFullYear()} {SITE_NAMES[lang]}. {ui.footerDisclaimer}</p>
             {(GA4_ID || CLARITY_ID) && CONSENT_MODE !== 'none' && <p><button type="button" data-consent-manage class="underline hover:text-navy-900">{consentStrings(lang).manage}</button></p>}
           </div>

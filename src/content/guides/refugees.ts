@@ -1,107 +1,94 @@
-import { defineGuide, type Helpers } from '../../lib/page-types';
+import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
-import type { Lang } from '../../lib/format';
 
-/* Réfugiés réinstallés (pris en charge par l'État, parrainés par le privé) et personnes protégées au Canada :
-   lignes prospectives hors Québec et Québec, membres de la famille à l'étranger, délai par pays des réfugiés
-   pris en charge par le gouvernement. Tout vient des fichiers d'IRCC relus. */
-const D = K.L.dates.flpt;
-const F0 = K.firstReading('flpt')!;
-const G = K.readingOf('refugees-gov'), PV = K.readingOf('refugees-priv'), PR = K.readingOf('protected');
-const tg = K.fullTrend(G.series)!, tp = K.fullTrend(PV.series)!, tpr = K.fullTrend(PR.series)!;
-const fl = (k: string) => K.L.flpt[k];
-const GQ = fl('government-refugees-quebec'), PQ = fl('private-refugees-quebec'), PRQ = fl('protected-persons-in-canada-quebec');
-const DA = fl('dependants-abroad-roc'), DAQ = fl('dependants-abroad-quebec');
-const tgq = K.fullTrend('f:government-refugees-quebec')!, tda = K.fullTrend('f:dependants-abroad-roc')!;
-const PQ0 = PV.queue![0];
-const yrs = Number(K.READ.slice(0, 4)) - Number(PQ0[0].slice(0, 4));
-const my = (key: string, l: Lang) => K.monthYear(`${key}-15`, l);
-const GOV = K.L.country.refugees_gov ?? {};
-const govC = Object.keys(GOV).filter((c) => c !== 'CA' && K.isTime(GOV[c])).sort((a, b) => (K.daysOf(GOV[a]) ?? 0) - (K.daysOf(GOV[b]) ?? 0));
-const gLo = govC[0], gHi = govC[govC.length - 1];
-const REF = { en: 'https://www.canada.ca/en/immigration-refugees-citizenship/services/refugees.html', fr: 'https://www.canada.ca/fr/immigration-refugies-citoyennete/services/refugies.html' };
-
-function lines(h: Helpers) {
-  const l = h.lang, fr = l === 'fr';
-  const row = (name: string, roc: { cur: unknown; waiting: number | null }, qc: { cur: unknown; waiting: number | null }) =>
-    [name, h.t(roc.cur as never), h.n(roc.waiting ?? 0), h.t(qc.cur as never), h.n(qc.waiting ?? 0)];
-  return [
-    row(fr ? 'Réfugiés pris en charge par le gouvernement' : 'Government-assisted refugees', { cur: G.t, waiting: G.waiting ?? null }, GQ),
-    row(fr ? 'Réfugiés parrainés par le secteur privé' : 'Privately sponsored refugees', { cur: PV.t, waiting: PV.waiting ?? null }, PQ),
-    row(fr ? 'Personnes protégées au Canada' : 'Protected persons in Canada', { cur: PR.t, waiting: PR.waiting ?? null }, PRQ),
-    row(fr ? 'Membres de la famille à l’étranger' : 'Family members abroad', DA, DAQ),
-  ];
-}
-function govRows(h: Helpers) {
-  return govC.map((c) => [h.cn(c), h.t(GOV[c])]);
-}
+/* Chiffres de la page : admissions de résidents permanents des catégories de réfugiés et de personnes protégées
+ * (Permanent Residents, Monthly IRCC Updates), données ouvertes sous la Licence du gouvernement ouvert du Canada.
+ * Aucune norme de service publiée pour ces programmes ; le délai de l'outil d'IRCC est saisi par le lecteur. */
+const E = K.en, F = K.fr;
+const M = K.PRD.months;
+const gar = K.pr12('gar'), psr = K.pr12('psr'), bv = K.pr12('bvor'), pp = K.pr12('protected'), dep = K.pr12('protectedDep'), all = K.pr12('all');
+const resettled = (gar.last ?? 0) + (psr.last ?? 0) + (bv.last ?? 0);
+const resettledPrev = (gar.prev ?? 0) + (psr.prev ?? 0) + (bv.prev ?? 0);
+const resCh = resettledPrev ? Math.round(((resettled - resettledPrev) / resettledPrev) * 1000) / 10 : null;
+const inland = (pp.last ?? 0) + (dep.last ?? 0);
+const total = resettled + inland;
+const shareAll = K.pctOf(total, all.last);
+const yr = (k: string, y: string) => K.yearSum(K.prSeries(k), M, y) ?? 0;
+const res = (y: string) => yr('gar', y) + yr('psr', y) + yr('bvor', y);
+const r23 = res('2023'), r24 = res('2024'), r25 = res('2025');
+const ps = K.prSeries('protected');
+let hiP = 0;
+ps.forEach((v, i) => { if ((v ?? 0) > (ps[hiP] ?? 0)) hiP = i; });
+const lastP = ps[ps.length - 1] ?? 0;
+const bigger = (psr.last ?? 0) >= (gar.last ?? 0) ? 'psr' : 'gar';
+const dirEn = (x: number | null) => (x == null ? 'unchanged' : x > 0 ? 'up' : 'down');
+const dirFr = (x: number | null) => (x == null ? 'stable' : x > 0 ? 'en hausse' : 'en baisse');
 
 export default defineGuide({
   id: 'refugees', group: 'family', order: 53,
   tool: 'delai', toolArg: { g: 'refugees-gov', only: 'refugees-gov,refugees-priv,protected' },
   related: ['spousal-sponsorship', 'dependent-child', 'pr-card', 'history', 'method'],
-  sources: ['ptimes-flpt', 'ptimes-country', 'ptimes', 'check-status', 'wayback'],
+  sources: ['ptimes', 'od-pr', 'od-std', 'check-status', 'ogl'],
   en: {
     slug: 'refugee-processing-time',
-    nav: 'Refugees', card: 'Resettled refugees, protected persons, Quebec and family abroad',
-    title: 'Refugee and Protected Person Processing Times, 2026',
-    description: 'Refugee processing times in 2026: government-assisted and privately sponsored refugees, protected persons in Canada, Quebec, family abroad, trend since 2025.',
-    h1: 'Refugees and protected persons: the published times',
-    intro: `IRCC’s file of ${K.en.day(D)} gives ${K.fmtTime(G.t, 'en')} for government-assisted refugees and ${K.fmtTime(PV.t, 'en')} for privately sponsored refugees, outside Quebec.`,
-    resume: `A refugee resettled to Canada with government support currently waits ${K.fmtTime(G.t, 'en')}, and a privately sponsored refugee ${K.fmtTime(PV.t, 'en')}, for destinations outside Quebec, according to the forward-looking times IRCC published on ${K.en.day(D)}. A person who already received refugee protection inside Canada and applies for permanent residence is looking at ${K.fmtTime(PR.t, 'en')}. The Quebec lines differ: ${K.fmtTime(GQ.cur, 'en')} for government-assisted refugees, ${K.fmtTime(PQ.cur, 'en')} for privately sponsored ones and ${K.fmtTime(PRQ.cur, 'en')} for protected persons. The private sponsorship line is the one that has moved most: it stood at ${K.fmtDays(tp.first!, 'm', 'en')} in our first copy, dated ${K.en.day(tp.firstDate!)}, and has fallen since, while ${K.num(PV.waiting ?? 0, 'en')} applications were still waiting. These figures describe the permanent residence step only. They say nothing about a refugee claim heard by the Immigration and Refugee Board, which has its own schedule. The tool above reads each line and its queue by month of filing.`,
+    nav: 'Refugees', card: 'Resettled refugees and protected persons: decision date, admissions',
+    title: 'Refugee and Protected Person Processing Time in 2026',
+    description: 'Estimate the decision date of a refugee resettlement or protected person file from the time IRCC shows, with the refugees Canada admitted in 2026 data.',
+    h1: 'Refugees and protected persons: from IRCC’s time to a date',
+    intro: `Canada admitted ${E.n(total)} refugees, protected persons and their dependants as permanent residents from ${E.w12(M)}.`,
+    resume: `IRCC shows three refugee lines on its “Check processing times” tool: government assisted refugees, privately sponsored refugees, and protected persons in Canada applying for permanent residence, all outside Quebec. Pick the line, enter its figure in the calculator above with the date IRCC received the complete application, and you get an estimated decision date with the days elapsed and those left. The other figures here come from Government of Canada open data, published under the Open Government Licence of Canada, and IRCC publishes no service standard for these programs. From ${E.w12(M)}, ${E.n(resettled)} resettled refugees became permanent residents, ${E.ch(resCh)} on the year before: ${E.n(gar.last)} government assisted, ${E.n(psr.last)} privately sponsored and ${E.n(bv.last)} under blended sponsorship. Over the same months, ${E.n(pp.last)} protected persons in Canada and ${E.n(dep.last)} of their dependants were admitted. Together they make ${E.pct(shareAll)} of all new permanent residents. These counts are admissions, not times, but they show how much the levels plan leaves for each stream.`,
     faqs: [
-      { q: 'How long does private refugee sponsorship take in 2026?', a: `For a refugee going to a province other than Quebec, IRCC expects ${K.fmtTime(PV.t, 'en')} (${K.en.day(D)}), with ${K.num(PV.waiting ?? 0, 'en')} files waiting. Applications received in ${my(PQ0[0], 'en')} still had ${K.num(PQ0[1] as number, 'en')} months to go. For Quebec, where sponsors deal with the Quebec government, the figure is ${K.fmtTime(PQ.cur, 'en')}.` },
-      { q: 'How long does permanent residence take for a protected person in Canada?', a: `Once the Immigration and Refugee Board grants protection, the person can apply for permanent residence. IRCC’s current estimate is ${K.fmtTime(PR.t, 'en')} outside Quebec and ${K.fmtTime(PRQ.cur, 'en')} in Quebec. The outside-Quebec line was ${K.fmtDays(tpr.first!, 'm', 'en')} when it first appeared in our archive on ${K.en.day(tpr.firstDate!)}.` },
-      { q: 'Does the time for government-assisted refugees depend on the country?', a: `Yes. Besides the overall figure, IRCC’s country file gives a time for government-assisted refugees in ${K.num(govC.length, 'en')} countries, from ${K.fmtTime(GOV[gLo], 'en')} in ${K.countryName(gLo, 'en')} to ${K.fmtTime(GOV[gHi], 'en')} in ${K.countryName(gHi, 'en')}. The country is where the refugee is when the case is processed. Other countries show no figure.` },
+      { q: 'Does the refugee time on IRCC’s tool include the asylum hearing?', a: 'No. For a protected person, the time IRCC shows starts once the Immigration and Refugee Board has granted protection and the permanent residence application has been received. The asylum claim and the hearing come before, under the Board, and are not counted in that figure or in the calculator.' },
+      { q: 'Is there a service standard for refugee resettlement?', a: 'Not in the Government of Canada service inventory. IRCC publishes no standard for government assisted refugees, privately sponsored refugees or protected persons. The only time available is the forward looking figure on IRCC’s tool, which you can copy into the calculator with the date of receipt.' },
+      { q: 'How many resettled refugees does Canada admit each year?', a: `IRCC’s open data counts ${E.n(r23)} resettled refugees admitted in 2023, ${E.n(r24)} in 2024 and ${E.n(r25)} in 2025, adding government assisted, privately sponsored and blended sponsorship refugees. The latest twelve months total ${E.n(resettled)}, ${E.ch(resCh)} on the twelve months before, as published by IRCC.` },
     ],
     body: (h) => `
-<h2>Four groups, two sides of Quebec</h2>
-<p>IRCC publishes forward-looking times for each way a refugee or protected person becomes a permanent resident, split between Quebec and the rest of Canada. Resettled refugees are selected abroad, usually after a referral, and come either with government support or with a private sponsor such as a community group. Protected persons are people whose refugee claim was accepted in Canada. Family members abroad are relatives of a protected person who apply from outside Canada.</p>
-${h.table(['Group', 'Outside Quebec', 'Waiting', 'Quebec', 'Waiting'], lines(h), `Forward-looking times and applications waiting, IRCC file of ${h.day(D)}.`, ['l', 'r', 'r', 'r', 'r'])}
-<p>The size of each line explains part of the gap. Outside Quebec, ${h.n(PR.waiting ?? 0)} protected persons and ${h.n(PV.waiting ?? 0)} privately sponsored refugees were waiting, against ${h.n(G.waiting ?? 0)} government-assisted refugees. Government-assisted arrivals follow yearly targets set in the immigration levels plan, which keeps that line comparatively steady: it moved between ${h.d(tg.min, 'm')} and ${h.d(tg.max, 'm')} over our archive.</p>
-<h2>Private sponsorship: a long line getting shorter</h2>
-<p>The privately sponsored line outside Quebec dropped from ${h.d(tp.first!, 'm')} on ${h.day(tp.firstDate!)} to ${h.d(tp.last, 'm')} now. It is still the longest of the three outside Quebec, and the queue shows why: files received in ${h.my(`${PQ0[0]}-15`)}, the oldest month IRCC lists, still had ${h.n(PQ0[1] as number)} months to go, with ${K.fmtAhead(PQ0[2], 'en')} people ahead. In other words, a sponsorship group that applied ${h.n(yrs)} years ago is not near the front. Our archive of these times starts on ${h.day(F0)}; every reading since is below, with the copy it comes from.</p>
-${h.hist(PV.series, { max: 12, unit: 'm' })}
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'refugees-priv', m: PV.queue![PV.queue!.length - 13][0] }, t: 'Your refugee file: time left for your month' })}
-<h2>Government-assisted refugees by country</h2>
-<p>IRCC’s weekly country file carries a separate line for government-assisted refugees, by the country where the refugee is when the case is processed. Only ${h.n(govC.length)} countries had a figure on ${h.day(K.L.dates.country)}; the rest show no published time. This is a past time, the delay within which most recent cases from that country were finished, so it is not directly comparable with the forward-looking line above.</p>
-${h.table(['Country', 'Published time'], govRows(h), `Government-assisted refugees, IRCC country file of ${h.day(K.L.dates.country)}.`, ['l', 'r'])}
-<h2>Quebec and families abroad</h2>
-<p>In Quebec, the government-assisted line is short, ${h.t(GQ.cur as never)}, but it has lengthened from ${h.d(tgq.first!, 'm')} in the first copy we hold, and very few files are in it (${h.n(GQ.waiting ?? 0)}). The protected person line in Quebec is published as ${h.t(PRQ.cur as never)}, the longest mention IRCC’s file uses, and ${h.n(PRQ.waiting ?? 0)} people were waiting. Family members abroad of a protected person outside Quebec face ${h.t(DA.cur as never)}; that line was ${h.d(tda.first!, 'm')} when it first appeared in our copies on ${h.day(tda.firstDate!)}.</p>
-<p>For a protected person, the wait for relatives abroad matters as much as their own file: family members listed in the application can be processed with it, but those abroad go through visa offices, medical exams and security checks in their country. The longer line abroad reflects that extra distance, not a lower priority.</p>
-<h2>What these figures do not cover</h2>
-<p>None of these times covers a refugee claim made in Canada: that hearing belongs to the Immigration and Refugee Board, an independent tribunal that publishes its own figures. The times here start once a complete permanent residence application is with IRCC, and they do not include medical exams, security screening abroad or travel arrangements. Readers can follow the official program pages on ${h.ext(h.lang === 'fr' ? REF.fr : REF.en, 'IRCC’s refugee section')}, and our ${h.a('method', 'method page')} explains how the forward-looking file is read and dated. Older readings for every line are on the ${h.a('history', 'history page')}.</p>
+<h2>Three lines, three different routes</h2>
+<p>Refugees reach permanent residence in Canada by two very different routes. Resettled refugees are selected abroad, usually after a referral by the United Nations refugee agency or by a private sponsor, and they land in Canada already as permanent residents. Protected persons made their claim inside Canada, received protection, and then apply for permanent residence from Canada. IRCC’s ${h.src('ptimes', '“Check processing times” tool')} gives one time for government assisted refugees, one for privately sponsored refugees and one for protected persons, each for files outside Quebec.</p>
+<p>Copy the line that matches the file, with its unit, into the calculator, and add the date IRCC received the complete application. For a private sponsorship, that is the date the sponsorship group’s application reached IRCC, not the date the group was formed. The calculator gives an estimated decision date and the share of the time already gone.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'refugees-priv', m: 'none' }, t: 'Your refugee file: estimated decision date' })}
+<h2>No published standard</h2>
+<p>The Government of Canada service inventory, released as ${h.src('od-std', 'open data')}, lists the service standards of IRCC and their results each year. None covers refugee resettlement or protected persons. The time on IRCC’s tool is therefore the only reference. It is forward looking: the time IRCC expects for a file received today, given the files waiting and the places in the levels plan. Resettlement also depends on travel, exit permits and the situation in the country of first refuge, which no time can predict. For a private sponsorship, the group’s own readiness to receive the family can also shape the arrival date.</p>
+<h2>Resettled refugees admitted, by month</h2>
+<p>The ${h.src('od-pr', 'open data on permanent residents')} counts each refugee category separately. Over the latest twelve months, ${h.pct(K.pctOf(K.pr12(bigger).last, resettled))} of resettled refugees came through the ${bigger === 'psr' ? 'private sponsorship' : 'government assisted'} stream, the largest of the three. Government assisted refugees were ${dirEn(gar.change)} ${h.pa(gar.change)} and privately sponsored refugees ${dirEn(psr.change)} ${h.pa(psr.change)} on the twelve months before.</p>
+${h.months(M, [[K.prName('gar', 'en'), K.prSeries('gar')], [K.prName('psr', 'en'), K.prSeries('psr')], [K.prName('protected', 'en'), ps], [K.prName('protectedDep', 'en'), K.prSeries('protectedDep')]], { caption: 'Admissions of permanent residents in the refugee and protected person categories, by month. Source: IRCC, Permanent Residents, Monthly IRCC Updates, open data; figures rounded.' })}
+<p>Across calendar years, resettled refugees numbered ${h.n(r23)} in 2023, ${h.n(r24)} in 2024 and ${h.n(r25)} in 2025. Resettlement arrives in waves that follow flights and group departures, so a single month can be twice the next one. Blended sponsorship, where the government and a private group share the cost, is small: ${h.n(bv.last)} admissions over the twelve months.</p>
+<h2>Protected persons in Canada</h2>
+<p>Admissions of protected persons follow another rhythm. The latest twelve months bring ${h.n(pp.last)}, ${dirEn(pp.change)} ${h.pa(pp.change)} on the twelve before, ${hiP === M.length - 1 ? `and the latest month published, ${h.my(M[hiP])}, is also the busiest since January 2023, with ${h.n(lastP)} admissions.` : `and the busiest month since January 2023 was ${h.my(M[hiP])}, with ${h.n(ps[hiP])}. The latest month published, ${h.my(M[M.length - 1])}, counts ${h.n(lastP)}.`} Their family members, admitted in a separate category, total ${h.n(dep.last)} over the year. A protected person can include them in the permanent residence application, and they then follow the same file.</p>
+<p>Until permanent residence is granted, a protected person holds no ${h.a('pr-card', 'permanent resident card')} and cannot sponsor a spouse or a child. Once it is granted, family members left out of the application can be sponsored through the ${h.a('spousal-sponsorship', 'spousal sponsorship')} or ${h.a('dependent-child', 'dependent child')} streams.</p>
+<h2>Following the file</h2>
+<p>A privately sponsored refugee is followed through the sponsorship group, which receives IRCC’s letters. A protected person can use IRCC’s ${h.src('check-status', 'application status tool')}. How this site reads IRCC’s data is set out on the ${h.a('method', 'method page')}, with the limits of each dataset.</p>
 `,
   },
   fr: {
     slug: 'delai-refugies',
-    nav: 'Réfugiés', card: 'Réfugiés réinstallés, personnes protégées, Québec et famille',
-    title: 'Délai des réfugiés réinstallés et personnes protégées 2026',
-    description: 'Délais 2026 des réfugiés pris en charge par l’État ou parrainés, des personnes protégées au Canada et de leur famille, au Québec et ailleurs, depuis 2025.',
-    h1: 'Réfugiés et personnes protégées : les délais publiés',
-    intro: `Au Québec, IRCC prévoit ${K.fmtTime(GQ.cur, 'fr')} pour un réfugié pris en charge par l’État et ${K.fmtTime(PQ.cur, 'fr')} pour un réfugié parrainé par le secteur privé (${K.fr.day(D)}).`,
-    resume: `Un réfugié réinstallé au Québec avec l’aide de l’État attend aujourd’hui ${K.fmtTime(GQ.cur, 'fr')}, et un réfugié parrainé par un groupe privé québécois ${K.fmtTime(PQ.cur, 'fr')}, selon les délais prospectifs publiés par IRCC le ${K.fr.day(D)}. Ailleurs au Canada, les chiffres sont de ${K.fmtTime(G.t, 'fr')} et de ${K.fmtTime(PV.t, 'fr')}. Une personne qui a obtenu l’asile au Canada et demande la résidence permanente doit compter ${K.fmtTime(PRQ.cur, 'fr')} au Québec, la mention la plus longue du fichier d’IRCC, contre ${K.fmtTime(PR.t, 'fr')} dans le reste du pays. La ligne québécoise des réfugiés pris en charge par l’État est courte mais s’allonge : elle était de ${K.fmtDays(tgq.first!, 'm', 'fr')} dans notre première copie, datée du ${K.fr.day(tgq.firstDate!)}. Ces délais ne portent que sur l’étape de la résidence permanente ; ils ne disent rien de l’audience d’une demande d’asile devant la Commission de l’immigration et du statut de réfugié, qui suit son propre calendrier. L’outil ci-dessus lit chaque ligne et sa file par mois de dépôt.`,
+    nav: 'Réfugiés', card: 'Réfugiés réinstallés et personnes protégées : date de décision, admissions',
+    title: 'Délai de traitement des réfugiés et personnes protégées 2026',
+    description: 'Estimez la date de décision d’un dossier de réfugié réinstallé ou de personne protégée à partir du délai d’IRCC, avec les réfugiés admis en 2026 au Canada.',
+    h1: 'Réfugiés et personnes protégées : du délai d’IRCC à une date',
+    intro: `Le Canada a admis ${F.n(total)} réfugiés, personnes protégées et membres de leur famille comme résidents permanents de ${F.w12(M)}.`,
+    resume: `IRCC affiche trois lignes pour les réfugiés dans son outil « Vérifier les délais de traitement » : réfugiés pris en charge par le gouvernement, réfugiés parrainés par le secteur privé, et personnes protégées au Canada qui demandent la résidence permanente, toutes hors Québec. Choisissez la ligne, saisissez son chiffre dans le calculateur ci-dessus avec la date de réception de la demande complète, et vous obtenez une date de décision estimée, avec les jours écoulés et ceux qui restent. Les autres chiffres viennent des données ouvertes du gouvernement du Canada, publiées sous la Licence du gouvernement ouvert du Canada, et IRCC ne publie aucune norme de service pour ces programmes. De ${F.w12(M)}, ${F.n(resettled)} réfugiés réinstallés sont devenus résidents permanents, soit ${F.ch(resCh)} sur un an : ${F.n(gar.last)} pris en charge par le gouvernement, ${F.n(psr.last)} parrainés par le secteur privé et ${F.n(bv.last)} par le parrainage mixte. Sur la même période, ${F.n(pp.last)} personnes protégées au Canada et ${F.n(dep.last)} membres de leur famille ont été admis. Ensemble, ils forment ${F.pct(shareAll)} des nouveaux résidents permanents.`,
     faqs: [
-      { q: 'Combien de temps prend le parrainage privé d’un réfugié au Québec ?', a: `IRCC prévoit ${K.fmtTime(PQ.cur, 'fr')} au ${K.fr.day(D)}, avec ${K.num(PQ.waiting ?? 0, 'fr')} demandes en attente. Le groupe parrain québécois passe d’abord par le gouvernement du Québec, qui délivre son engagement, avant l’examen fédéral. Hors Québec, le même parrainage est estimé à ${K.fmtTime(PV.t, 'fr')}.` },
-      { q: 'Quel est le délai de résidence permanente d’une personne protégée au Québec ?', a: `IRCC publie ${K.fmtTime(PRQ.cur, 'fr')} pour cette ligne au ${K.fr.day(D)}, avec ${K.num(PRQ.waiting ?? 0, 'fr')} personnes en attente. Hors Québec, la même demande est estimée à ${K.fmtTime(PR.t, 'fr')}. La personne doit d’abord obtenir le Certificat de sélection du Québec avant que le dossier fédéral se termine.` },
-      { q: 'Le délai des réfugiés pris en charge par l’État varie-t-il selon le pays ?', a: `Oui. Le fichier par pays d’IRCC donne un délai pour ${K.num(govC.length, 'fr')} pays, de ${K.fmtTime(GOV[gLo], 'fr')} (${K.countryName(gLo, 'fr')}) à ${K.fmtTime(GOV[gHi], 'fr')} (${K.countryName(gHi, 'fr')}). Le pays retenu est celui où se trouve le réfugié pendant le traitement. Les autres pays n’ont pas de chiffre publié.` },
+      { q: 'Le délai des réfugiés dans l’outil d’IRCC inclut-il l’audience d’asile ?', a: 'Non. Pour une personne protégée, le délai affiché par IRCC part du moment où la Commission de l’immigration et du statut de réfugié a accordé l’asile et où la demande de résidence permanente a été reçue. La demande d’asile et l’audience viennent avant, devant la Commission, et ne sont comptées ni dans ce chiffre ni dans le calculateur.' },
+      { q: 'Existe-t-il une norme de service pour la réinstallation des réfugiés ?', a: 'Pas dans l’inventaire des services du gouvernement du Canada. IRCC ne publie aucune norme pour les réfugiés pris en charge par le gouvernement, les réfugiés parrainés par le secteur privé ni les personnes protégées. Le seul délai disponible est le chiffre prospectif de l’outil d’IRCC, à recopier dans le calculateur avec la date de réception.' },
+      { q: 'Combien de réfugiés réinstallés le Canada admet-il chaque année ?', a: `Les données ouvertes d’IRCC comptent ${F.n(r23)} réfugiés réinstallés admis en 2023, ${F.n(r24)} en 2024 et ${F.n(r25)} en 2025, en additionnant les réfugiés pris en charge par le gouvernement, parrainés par le secteur privé et du parrainage mixte. Les douze derniers mois en totalisent ${F.n(resettled)}, soit ${F.ch(resCh)} sur un an.` },
     ],
     body: (h) => `
-<h2>Quatre groupes, deux côtés du Québec</h2>
-<p>IRCC publie un délai prospectif pour chaque voie qui mène un réfugié ou une personne protégée à la résidence permanente, en séparant le Québec du reste du Canada. Les réfugiés réinstallés sont choisis à l’étranger, le plus souvent sur recommandation, et arrivent avec l’aide de l’État ou avec un parrain privé, par exemple un groupe communautaire. Les personnes protégées ont vu leur demande d’asile acceptée au Canada. Les membres de la famille à l’étranger sont des proches d’une personne protégée qui présentent leur demande hors du Canada.</p>
-${h.table(['Groupe', 'Hors Québec', 'En attente', 'Québec', 'En attente'], lines(h), `Délais prospectifs et demandes en attente, fichier d’IRCC du ${h.day(D)}.`, ['l', 'r', 'r', 'r', 'r'])}
-<p>Au Québec, le gouvernement provincial sélectionne les réfugiés réinstallés et délivre le Certificat de sélection du Québec aux personnes protégées. Cette étape explique en partie des chiffres très différents de ceux du reste du pays : la ligne des personnes protégées y est publiée comme ${h.t(PRQ.cur as never)}, alors que celle des réfugiés pris en charge par l’État compte peu de dossiers, ${h.n(GQ.waiting ?? 0)} au dernier relevé.</p>
-<h2>L’évolution côté Québec</h2>
-<p>La ligne québécoise des réfugiés pris en charge par l’État est passée de ${h.d(tgq.first!, 'm')} le ${h.day(tgq.firstDate!)} à ${h.d(tgq.last, 'm')} aujourd’hui : peu de dossiers, mais un délai qui s’allonge. Notre archive de ces délais commence le ${h.day(F0)} ; chaque relevé est listé ci-dessous avec la copie d’où il vient, sans aucun point ajouté.</p>
-${h.hist('f:government-refugees-quebec', { max: 12, unit: 'm' })}
-<p>Hors Québec, le parrainage privé a beaucoup reculé, de ${h.d(tp.first!, 'm')} à ${h.d(tp.last, 'm')}, mais la file reste lourde : les dossiers reçus en ${h.my(`${PQ0[0]}-15`)}, le plus ancien mois listé, avaient encore ${h.n(PQ0[1] as number)} mois devant eux, avec ${K.fmtAhead(PQ0[2], 'fr')} personnes devant. Un groupe parrain qui a déposé il y a ${h.n(yrs)} ans n’est donc pas près de la tête de file.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'refugees-gov', m: G.queue![G.queue!.length - 13][0] }, t: 'Votre dossier de réfugié : temps restant pour votre mois' })}
-<h2>Réfugiés pris en charge par l’État, par pays</h2>
-<p>Le fichier hebdomadaire par pays d’IRCC contient une ligne distincte pour les réfugiés pris en charge par le gouvernement, selon le pays où se trouve le réfugié pendant le traitement. Seuls ${h.n(govC.length)} pays avaient un chiffre le ${h.day(K.L.dates.country)}. C’est un délai passé, le temps dans lequel la plupart des dossiers récents de ce pays ont été terminés : il ne se compare pas directement à la ligne prospective plus haut.</p>
-${h.table(['Pays', 'Délai publié'], govRows(h), `Réfugiés pris en charge par le gouvernement, fichier par pays d’IRCC du ${h.day(K.L.dates.country)}.`, ['l', 'r'])}
-<p>Pour une personne protégée, l’attente de la famille restée à l’étranger compte autant que son propre dossier. Les proches inscrits dans la demande peuvent être traités avec elle, mais ceux qui vivent hors du Canada passent par un bureau des visas, un examen médical et des contrôles de sécurité dans leur pays, ce qui allonge la ligne sans traduire une priorité moindre.</p>
-<h2>Ce que ces délais ne couvrent pas</h2>
-<p>Aucun de ces délais ne concerne l’examen d’une demande d’asile faite au Canada : cette audience relève de la Commission de l’immigration et du statut de réfugié, un tribunal indépendant qui publie ses propres chiffres. Les délais de cette page partent du moment où IRCC reçoit une demande de résidence permanente complète. Ils ne comprennent pas l’examen médical, les contrôles de sécurité à l’étranger ni l’organisation du voyage. La famille à l’étranger d’une personne protégée hors Québec doit compter ${h.t(DA.cur as never)}, une ligne qui était de ${h.d(tda.first!, 'm')} à sa première apparition dans nos copies, le ${h.day(tda.firstDate!)}. Les pages officielles sont dans la ${h.ext(h.lang === 'fr' ? REF.fr : REF.en, 'section Réfugiés d’IRCC')}, et notre ${h.a('method', 'page de méthode')} explique comment le fichier prospectif est lu et daté. Les relevés de chaque ligne sont sur la ${h.a('history', 'page de l’historique')}.</p>
+<h2>Trois lignes, trois parcours différents</h2>
+<p>Les réfugiés accèdent à la résidence permanente au Canada par deux voies très différentes. Les réfugiés réinstallés sont choisis à l’étranger, le plus souvent après un signalement de l’agence des Nations unies pour les réfugiés ou d’un répondant privé, et arrivent au Canada déjà résidents permanents. Les personnes protégées ont demandé l’asile au Canada, l’ont obtenu, puis demandent la résidence permanente depuis le Canada. L’${h.src('ptimes', 'outil « Vérifier les délais de traitement »')} d’IRCC donne un délai pour les réfugiés pris en charge par le gouvernement, un pour les réfugiés parrainés par le secteur privé et un pour les personnes protégées, chaque fois hors Québec.</p>
+<p>Recopiez la ligne qui correspond au dossier, avec son unité, dans le calculateur, puis la date de réception de la demande complète par IRCC. Pour un parrainage privé, c’est la date à laquelle la demande du groupe de répondants est arrivée chez IRCC, pas celle de la formation du groupe. Le calculateur donne une date de décision estimée et la part du délai déjà écoulée.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'protected', m: 'none' }, t: 'Votre dossier de réfugié : date de décision estimée' })}
+<h2>Aucune norme publiée</h2>
+<p>L’inventaire des services du gouvernement du Canada, diffusé en ${h.src('od-std', 'données ouvertes')}, recense chaque année les normes de service d’IRCC et leurs résultats. Aucune ne couvre la réinstallation des réfugiés ni les personnes protégées. Le délai de l’outil d’IRCC est donc la seule référence. Il est prospectif : c’est le temps prévu pour un dossier reçu aujourd’hui, selon les dossiers en attente et les places du plan des niveaux. La réinstallation dépend aussi des vols, des permis de sortie et de la situation dans le pays de premier asile, qu’aucun délai ne peut prévoir.</p>
+<h2>Les réfugiés réinstallés admis, par mois</h2>
+<p>Les ${h.src('od-pr', 'données ouvertes sur les résidents permanents')} comptent chaque catégorie de réfugiés à part. Sur les douze derniers mois, ${h.pct(K.pctOf(K.pr12(bigger).last, resettled))} des réfugiés réinstallés sont passés par le volet ${bigger === 'psr' ? 'du parrainage privé' : 'de la prise en charge par le gouvernement'}, le plus important des trois. Les réfugiés pris en charge par le gouvernement sont ${dirFr(gar.change)} de ${h.pa(gar.change)} et les réfugiés parrainés par le secteur privé ${dirFr(psr.change)} de ${h.pa(psr.change)} sur les douze mois précédents.</p>
+${h.months(M, [[K.prName('gar', 'fr'), K.prSeries('gar')], [K.prName('psr', 'fr'), K.prSeries('psr')], [K.prName('protected', 'fr'), ps], [K.prName('protectedDep', 'fr'), K.prSeries('protectedDep')]], { caption: 'Admissions de résidents permanents dans les catégories de réfugiés et de personnes protégées, par mois. Source : IRCC, Résidents permanents, mises à jour mensuelles, données ouvertes ; chiffres arrondis.' })}
+<p>Par année civile, les réfugiés réinstallés étaient ${h.n(r23)} en 2023, ${h.n(r24)} en 2024 et ${h.n(r25)} en 2025. La réinstallation arrive par vagues, au rythme des vols et des départs de groupes : un mois peut compter deux fois plus que le suivant. Le parrainage mixte, où le gouvernement et un groupe privé partagent les frais, reste petit : ${h.n(bv.last)} admissions sur douze mois.</p>
+<h2>Les personnes protégées au Canada</h2>
+<p>Les admissions de personnes protégées suivent un autre rythme. Les douze derniers mois en apportent ${h.n(pp.last)}, ${dirFr(pp.change)} de ${h.pa(pp.change)} sur les douze précédents, ${hiP === M.length - 1 ? `et le dernier mois publié, ${h.my(M[hiP])}, est aussi le plus chargé depuis janvier 2023, avec ${h.n(lastP)} admissions.` : `et le mois le plus chargé depuis janvier 2023 a été ${h.my(M[hiP])}, avec ${h.n(ps[hiP])}. Le dernier mois publié, ${h.my(M[M.length - 1])}, en compte ${h.n(lastP)}.`} Les membres de leur famille, admis dans une catégorie distincte, totalisent ${h.n(dep.last)} sur l’année. Une personne protégée peut les inclure dans sa demande de résidence permanente : ils suivent alors le même dossier.</p>
+<p>Tant que la résidence permanente n’est pas accordée, une personne protégée n’a pas de ${h.a('pr-card', 'carte de résident permanent')} et ne peut parrainer ni époux ni enfant. Une fois la résidence obtenue, les membres de la famille restés hors de la demande peuvent être parrainés par les volets du ${h.a('spousal-sponsorship', 'parrainage de l’époux')} ou de l’${h.a('dependent-child', 'enfant à charge')}.</p>
+<h2>Suivre le dossier</h2>
+<p>Un réfugié parrainé par le secteur privé est suivi par son groupe de répondants, qui reçoit les lettres d’IRCC. Une personne protégée peut utiliser l’${h.src('check-status', 'outil de suivi de l’état des demandes')} d’IRCC. La façon dont ce site lit les données d’IRCC est décrite sur la ${h.a('method', 'page de méthode')}, avec les limites de chaque jeu de données.</p>
 `,
   },
 });

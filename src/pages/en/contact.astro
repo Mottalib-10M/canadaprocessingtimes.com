@@ -11,12 +11,11 @@ const description = 'Write to the publisher of Canada Processing Times about a 2
 <PageLayout title="Contact Canada Processing Times 2026: corrections, sources" description={description} lang={lang} noindex={true} jsonLd={[contactPageSchema({ name: 'Contact', description, path, lang })]} breadcrumbs={[{ label: 'Contact' }]} showAuthor={false}>
   <div class="prose prose-slate max-w-none">
     <h1>Contact</h1>
-    <p>Write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. There is no form, no phone line and no account: one address, read by the people who keep the archive and the calculators up to date.</p>
+    <p>Write to <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>. There is no form, no phone line and no account: one address, read by the people who keep the data and the calculators up to date.</p>
     <h2>Messages that help</h2>
     <ul>
-      <li>A time or a date that differs from what IRCC’s tool shows: give the application type, the country and the date you looked.</li>
-      <li>An IRCC line this site does not follow yet.</li>
-      <li>An older copy of IRCC’s files, with its date, that would fill a gap in the archive.</li>
+      <li>A figure that differs from IRCC’s open data or a date the calculator gets wrong: give the page, the application type and the values you entered.</li>
+      <li>An IRCC open data set this site does not use yet.</li>
       <li>Embedding the calculator on a community or student site: the code is on the <a href={route('widget', lang)}>embed page</a>.</li>
     </ul>
     <h2>What we cannot do</h2>

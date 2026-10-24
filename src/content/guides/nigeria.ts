@@ -1,72 +1,55 @@
-import { defineGuide, type Helpers } from '../../lib/page-types';
+import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
+import { dir, ord, pts, rank, studyYear } from './_pays-en';
 
-/* Nigeria : le visa de visiteur a fait le grand écart depuis 2024. Tout chiffre vient du fichier par pays d'IRCC. */
+/* Nigeria: the approval share moved more than the volume, so the page opens on it, then visitors, students, PR.
+ * Every figure comes from IRCC open data (OGL-Canada 2.0), by country of citizenship (of birth for new citizens). */
 const C = 'NG';
 const E = K.en;
-const D = K.L.dates.country;
-const R = K.HIST.readings.country.map((r) => r.ircc);
-const t = (p: string, c = C) => K.readingOf(p, c).t;
-const days = (p: string, c = C) => K.daysOf(t(p, c));
-const ord = (n: number) => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return `${n}${s[(v - 20) % 10] || s[v] || s[0]}`; };
-function rank(p: string, c = C) {
-  const all = K.countriesOf(p).map((x) => K.daysOf(K.readingOf(p, x).t)).filter((x): x is number => x != null);
-  const d = days(p, c);
-  return { pos: d == null ? 0 : all.filter((x) => x < d).length + 1, n: all.length };
-}
-const S = { vis: `c:visitor-outside-canada:${C}`, sv: `c:supervisa:${C}`, st: `c:study:${C}`, wk: `c:work:${C}`, ch: `c:child_dependent:${C}` };
-const vis = K.fullTrend(S.vis)!, sv = K.fullTrend(S.sv)!, st = K.fullTrend(S.st)!, wk = K.fullTrend(S.wk)!, ch = K.fullTrend(S.ch)!;
-const vp = K.points(S.vis);
-const lowAt = vp.findIndex((p) => p.date === vis.minDate);
-const sinceLow = vp.slice(lowAt);
-const risesSinceLow = sinceLow.filter((p, i) => i > 0 && p.v > sinceLow[i - 1].v).length;
-const rV = rank('visitor'), rS = rank('super-visa'), rSt = rank('study'), rW = rank('work'), rC = rank('child');
-const svQuicker = (days('super-visa') ?? 0) < (days('visitor') ?? 0);
-const NEIGH = ['GH', 'SN', 'CM', 'KE', 'ZA'].filter((c) => K.countriesOf('visitor').includes(c));
-
-function neighbours(h: Helpers) {
-  return [C, ...NEIGH].map((c) => [
-    c === C ? `<strong>${h.cn(c)}</strong>` : K.COUNTRY_PAGE[c] ? h.a(K.COUNTRY_PAGE[c], h.cn(c)) : h.cn(c),
-    h.t(t('visitor', c)), h.t(t('super-visa', c)), h.t(t('study', c)), h.t(t('work', c)),
-  ]);
-}
+const fin = K.ops12('trFin', C), rin = K.ops12('trIn', C), ok = K.approval12(C), all = K.approval12();
+const v1 = K.ops12('v1', C), sp = K.ops12('spFin', C), prIn = K.ops12('prIn', C), copr = K.ops12('copr', C), cit = K.ops12('cit', C);
+const gap = pts(ok.rate, ok.prevRate), okN = K.ops12('trOk', C);
+const rFin = rank('trFin', C), rSp = rank('spFin', C);
+const s23 = studyYear(C, '2023')!, s24 = studyYear(C, '2024')!, s25 = studyYear(C, '2025')!;
+const ee = K.eeCountry(K.EE_FULL, C);
+const eeRank = K.eeTop(K.EE_FULL, 30).findIndex(([c]) => c === C) + 1;
+const stdV = K.stdOf('visitor')!;
+if (!(gap != null && gap >= 5)) throw new Error('nigeria : le texte suppose une part approuvée en nette hausse sur un an');
+if (rSp == null || rSp > 5) throw new Error('nigeria : le texte suppose le Nigeria parmi les 5 premiers pays des permis d’études');
+if (!(fin.change != null && fin.change < 0)) throw new Error('nigeria : le texte suppose moins de demandes finalisées qu’un an plus tôt');
 
 export default defineGuide({
   id: 'nigeria', group: 'countries', order: 105, country: C,
-  tool: 'delai', toolArg: { g: 'visitor', c: C, only: 'visitor,super-visa,study,work,child' },
+  tool: 'pays', toolArg: { c: C },
   related: ['visitor-visa', 'super-visa', 'study-permit', 'work-permit', 'dependent-child', 'cameroon'],
-  sources: ['ptimes-country', 'visit', 'super-visa', 'study-permit', 'work-permit', 'spouse', 'biometrics', 'wayback'],
+  sources: ['open-data', 'od-study', 'od-std', 'od-ee', 'ptimes', 'visit', 'ogl'],
   en: {
     slug: 'nigeria-processing-times',
-    nav: 'Nigeria', card: 'Visitor visa swing since 2024, study, work, child',
-    title: 'Processing Times from Nigeria: Visitor Visa, Permits 2026',
-    description: 'Visitor visa, super visa, study and work permit and child sponsorship times for applications made from Nigeria in 2026, with each dated IRCC reading since 2024.',
-    h1: 'Processing times for applications made from Nigeria',
-    intro: `IRCC’s figures for Nigeria, dated ${E.day(D)}: visitor visa ${K.fmtTime(t('visitor'), 'en')}, study permit ${K.fmtTime(t('study'), 'en')}, work permit ${K.fmtTime(t('work'), 'en')}.`,
-    resume: `A visitor visa applied for from Nigeria currently takes ${K.fmtTime(t('visitor'), 'en')}, according to the processing times IRCC published on ${E.day(D)}. That puts Nigeria ${ord(rV.pos)} of the ${E.n(rV.n)} countries with a figure, counted from the fastest. The line has travelled a long way: ${E.d(vis.first!)} in the oldest copy we hold, dated ${E.day(vis.firstDate!)}, then a low of ${E.d(vis.min)} on ${E.day(vis.minDate)}, and since that low it has gone up at ${E.n(risesSinceLow)} of the ${E.n(sinceLow.length - 1)} readings that followed. The other lines for Nigeria are a super visa at ${K.fmtTime(t('super-visa'), 'en')}, a study permit at ${K.fmtTime(t('study'), 'en')}, a work permit at ${K.fmtTime(t('work'), 'en')} and a dependent child sponsorship at ${K.fmtTime(t('child'), 'en')}. Each figure is a past time: how long IRCC took to finish 80% of the files it recently decided from Nigeria, counted from receipt of a complete application, with the biometrics appointment on top. It describes what happened to other applicants, not a promised date for yours.`,
+    nav: 'Nigeria', card: 'Approval share, visitor visas, students and new residents from Nigeria',
+    title: 'Approval Share for Nigerian Applicants to Canada, 2026',
+    description: 'How many Canadian visa, study and work applications from Nigerian citizens IRCC finalized and approved in 2026, plus permanent residence and new citizens.',
+    h1: 'Nigerian citizens and Canada: fewer files, more approvals',
+    intro: `${E.pct(ok.rate)} of the temporary residence files IRCC finalized for Nigerian citizens from ${E.w12()} were approved, against ${E.pct(ok.prevRate)} a year earlier.`,
+    resume: `The figure that moved most for Nigerian citizens is the share of files approved. From ${E.w12()}, IRCC finalized ${E.n(fin.last)} temporary residence applications from citizens of Nigeria, ${E.pa(fin.change)} fewer than over the twelve months before, and ${E.pct(ok.rate)} of them ended in an approval, up ${E.n(gap, 1)} points from ${E.pct(ok.prevRate)}. Across all countries the share was ${E.pct(all.rate)}. Finalized files include refusals and withdrawals, so the rest is not a refusal rate. Visitor visas approved for Nigerians came to ${E.n(v1.last)} (${E.ch(v1.change)}), while ${E.n(s25)} study permits took effect in 2025 after ${E.n(s23)} in 2023. On the permanent side, IRCC issued ${E.n(copr.last)} permanent residence authorizations and ${E.n(cit.last)} people born in Nigeria became Canadian citizens. For the wait on your own file, read the time IRCC shows for the country you apply from and date it with the calculator.`,
     faqs: [
-      { q: 'How long does a Canadian visitor visa from Nigeria take right now?', a: `IRCC’s figure dated ${E.day(D)} is ${K.fmtTime(t('visitor'), 'en')} for a visitor visa applied for from Nigeria. The lowest value in our archive was ${E.d(vis.min)} on ${E.day(vis.minDate)} and the highest ${E.d(vis.max)} on ${E.day(vis.maxDate)}. Count from the day IRCC received your complete application; giving fingerprints and a photo comes on top of that time.` },
-      { q: 'Is a super visa from Nigeria quicker than a visitor visa?', a: `On ${E.day(D)} the super visa line for Nigeria was ${K.fmtTime(t('super-visa'), 'en')} against ${K.fmtTime(t('visitor'), 'en')} for an ordinary visitor visa. ${svQuicker ? 'So the super visa is currently the shorter of the two,' : 'So the ordinary visitor visa is currently the shorter of the two,'} although the super visa asks for more: a Canadian child or grandchild who meets the income test, private medical insurance and a medical exam.` },
-      { q: 'Do Nigerian students wait longer than students from other countries?', a: `The study permit time from Nigeria is ${K.fmtTime(t('study'), 'en')}, which is ${ord(rSt.pos)} of the ${E.n(rSt.n)} countries with a figure on ${E.day(D)}. Ghana is at ${K.fmtTime(t('study', 'GH'), 'en')} and Kenya at ${K.fmtTime(t('study', 'KE'), 'en')}. The time runs from receipt of a complete application, so a missing document or a late biometrics appointment adds to it.` },
-      { q: 'How long does sponsoring a dependent child living in Nigeria take?', a: `IRCC lists ${K.fmtTime(t('child'), 'en')} for a dependent child sponsorship processed for Nigeria, on ${E.day(D)}. Only ${E.n(rC.n)} countries have a published figure for this line, and Nigeria is ${ord(rC.pos)} of them. Our oldest copy, dated ${E.day(ch.firstDate!)}, showed ${E.d(ch.first!, 'm')}.` },
+      { q: 'Is IRCC approving more applications from Nigeria than before?', a: `Yes, in share. From ${E.w12()}, ${E.pct(ok.rate)} of temporary residence files finalized for Nigerian citizens were approved, against ${E.pct(ok.prevRate)} over the twelve months before. The number of files finalized fell at the same time, by ${E.pa(fin.change)}, and IRCC approved ${E.n(okN.last)} files against ${E.n(okN.prev)} a year earlier.` },
+      { q: 'How many Nigerian students get a Canadian study permit?', a: `IRCC’s open data counts ${E.n(s23)} study permits that took effect for Nigerian citizens in 2023, ${E.n(s24)} in 2024 and ${E.n(s25)} in 2025. New study permit applications finalized over the latest twelve months reached ${E.n(sp.last)}, which ranks Nigeria ${ord(rSp)} among all countries of citizenship for that line.` },
+      { q: 'How many Nigerians became Canadian permanent residents this year?', a: `From ${E.w12()}, IRCC issued ${E.n(copr.last)} confirmations or visas of permanent residence to Nigerian citizens, ${dir(copr.change, 'more', 'fewer', 'about as many')} than a year earlier (${E.ch(copr.change)}). It received ${E.n(prIn.last)} new permanent residence applications from them over the same period, counted in people.` },
     ],
     body: (h) => `
-<h2>A visitor visa line that fell, then climbed back</h2>
-<p>No line for Nigeria has moved as much as the visitor visa. In the copy of IRCC’s file dated ${h.day(vis.firstDate!)}, the time was ${h.d(vis.first!)}. By ${h.day(vp[1].date)} it was ${h.d(vp[1].v)}, and the next copy we could find, dated ${h.day(vp[2].date)}, showed ${h.d(vp[2].v)}. The lowest value we hold is ${h.d(vis.min)}, on ${h.day(vis.minDate)}. From that low it rose at ${h.n(risesSinceLow)} of the ${h.n(sinceLow.length - 1)} following readings and reached ${h.d(vis.last)} on ${h.day(vis.lastDate)}.</p>
-<p>The archive has a hole worth stating plainly. Between ${h.day(R[1])} and ${h.day(R[2])}, no public copy of the country file survives in the Internet Archive, so we cannot say what happened in those months: whether the time went down steadily or bounced in between. The table below lists only the readings that exist, each with the copy it comes from.</p>
-${h.hist(S.vis, { max: 12, unit: 'd', caption: `Visitor visa from Nigeria: every dated reading we hold, newest first. Date = update date published by IRCC.` })}
-<p>Why the swing? IRCC does not publish its reasons by country. What the figure reflects is the volume of files decided by the offices that handle Nigerian applications and how many of them needed extra checks. A rise over several readings, like the one since ${h.my(vis.minDate)}, usually means more files reached a decision that had been waiting a long time.</p>
-<h2>Nigeria against all countries</h2>
-<p>Placed in the full list, Nigeria is ${ord(rV.pos)} of ${h.n(rV.n)} for the visitor visa, ${ord(rS.pos)} of ${h.n(rS.n)} for the super visa, ${ord(rSt.pos)} of ${h.n(rSt.n)} for the study permit and ${ord(rW.pos)} of ${h.n(rW.n)} for the work permit, always counted from the shortest time. ${svQuicker ? `The super visa is the odd one out: at ${h.t(t('super-visa'))}, it is currently shorter than the plain ${h.a('visitor-visa', 'visitor visa')}.` : `The super visa, at ${h.t(t('super-visa'))}, sits close to the plain ${h.a('visitor-visa', 'visitor visa')}.`} Its own history ran from ${h.d(sv.first!)} in ${h.my(sv.firstDate!)} to ${h.d(sv.last)} now.</p>
-<p>The comparison with other countries in the region helps read these numbers. Each line in the table is the figure IRCC published on ${h.day(D)} for applications made from that country.</p>
-${h.table(['Country of filing', 'Visitor visa', 'Super visa', 'Study permit', 'Work permit'], neighbours(h), `IRCC figures of ${h.day(D)} for Nigeria and other African countries.`, ['l', 'r', 'r', 'r', 'r'])}
-<h2>Study and work permits</h2>
-<p>The ${h.a('study-permit', 'study permit')} line for Nigeria went from ${h.d(st.first!, 'w')} in ${h.my(st.firstDate!)} down to ${h.d(st.min, 'w')} on ${h.day(st.minDate)}, and stands at ${h.t(t('study'))} today. The ${h.a('work-permit', 'work permit')} line followed a similar path, from ${h.d(wk.first!, 'w')} to a low of ${h.d(wk.min, 'w')} on ${h.day(wk.minDate)}, then ${h.t(t('work'))} now. Both are counted in weeks by IRCC. When a figure stays flat for several readings in a row, it often means the office is deciding files at about the pace they arrive.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'study', c: C, m: 'none' }, t: 'From Nigeria: your estimated decision date' })}
-<h2>Sponsoring a child in Nigeria</h2>
-<p>Nigeria is one of only ${h.n(rC.n)} countries for which IRCC publishes a time for a ${h.a('dependent-child', 'dependent child sponsorship')}. The current figure is ${h.t(t('child'))}. It was ${h.d(ch.first!, 'm')} in ${h.my(ch.firstDate!)}, dropped to ${h.d(ch.min, 'm')} on ${h.day(ch.minDate)} and has gone back up since. This line counts the whole sponsorship, from the day IRCC receives the application to the decision on permanent residence, so it is measured in months rather than weeks.</p>
-<h2>Which line applies to you</h2>
-<p>The country is the one you apply from, not your passport. A Nigerian citizen who lives legally in Ghana, the United Kingdom or the United Arab Emirates and applies there falls under that country’s line. Nigerian citizens need a visa to visit Canada and cannot use an eTA, and every applicant from Nigeria gives biometrics, so the date in the tool is the date IRCC received the complete application plus the published time, with the appointment to add. How each figure is read and stored is set out on the ${h.a('method', 'method page')}, and all dated copies are on the ${h.a('history', 'history page')}.</p>
+<h2>A higher share, a smaller line</h2>
+<p>Nigeria ranks ${ord(rFin)} among all countries for temporary residence applications finalized by IRCC from ${h.w12()}: ${h.n(fin.last)} files, against ${h.n(fin.prev)} the year before. Nigerian citizens sent ${h.n(rin.last)} new applications or extensions over the same months. What changed most is the outcome. ${h.pct(ok.rate)} of the files finalized were approved, ${h.n(gap, 1)} points more than a year earlier, while the share for all countries stood at ${h.pct(all.rate)}.</p>
+<p>A share of approvals is not a forecast for a single file. It mixes visitor visas, study and work permits, first applications and extensions, and counts withdrawn files with refused ones. Read it as the climate around Nigerian applications, then look at the line that matches yours in the profile above.</p>
+<p>In numbers, IRCC approved ${h.n(okN.last)} temporary residence files for Nigerian citizens over the latest twelve months, against ${h.n(okN.prev)} over the twelve before (${h.ch(okN.change)}). With fewer files decided and a higher share approved, the two movements ${okN.change != null && Math.abs(okN.change) < 5 ? 'nearly cancel out' : okN.change != null && okN.change > 0 ? 'leave more approvals overall' : 'still leave fewer approvals overall'}. The table below lets you follow them month by month since January 2023.</p>
+${h.months(K.MONTHS, [['Finalized', K.full('trFin', C)], ['Approved', K.full('trOk', C)], ['Visitor visas approved', K.full('v1', C)]], { caption: 'Nigerian citizens by month, newest first: temporary residence files finalized and approved, visitor visas approved. Source: IRCC, Operational Processing, open data (Open Government Licence of Canada); figures rounded to 5.' })}
+<h2>Visiting family in Canada</h2>
+<p>Many Nigerian citizens deal with IRCC for a visitor visa, to see relatives, attend a graduation or travel for business. ${h.n(v1.last)} were approved over the latest twelve months, ${dir(v1.change)} ${h.pa(v1.change)} on the year before. IRCC’s national service standard for a visitor visa requested from outside Canada is ${K.fmtStd(stdV.cur, 'en')}, met for ${h.pct(stdV.cur.perf)} of applications in ${K.fmtFy(stdV.fy, 'en')}; the time IRCC shows for Nigeria on its ${h.src('ptimes', 'processing times tool')} can differ widely from that target, so the calculator below starts from that figure, not from the standard.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'visitor', c: C, m: 'none' }, t: 'Your visitor visa from Nigeria: estimated decision date' })}
+<p>Parents and grandparents who want longer stays can look at the ${h.a('super-visa', 'super visa')}, designed for long family visits. Children of a Canadian or a permanent resident come through the ${h.a('dependent-child', 'dependent child sponsorship')}.</p>
+<h2>Students</h2>
+<p>Nigeria is one of the main sources of international students in Canada. IRCC finalized ${h.n(sp.last)} new study permit applications for Nigerian citizens over the latest twelve months (${h.ch(sp.change)}), ${ord(rSp)} among all countries. Permits that took effect went from ${h.n(s23)} in 2023 to ${h.n(s24)} in 2024 and ${h.n(s25)} in 2025. The ${h.a('study-permit', 'study permit page')} covers the provincial attestation letter and the documents IRCC asks for. A student already in Canada who renews a permit files from inside Canada and reads that line on IRCC’s tool, not the Nigeria line.</p>
+<h2>Permanent residence and citizenship</h2>
+<p>IRCC received ${h.n(prIn.last)} permanent residence applications from Nigerian citizens from ${h.w12()} (${h.ch(prIn.change)}) and issued ${h.n(copr.last)} authorizations. Express Entry invited ${h.n(ee)} Nigerian citizens in ${K.EE_FULL}${eeRank > 0 ? `, ${ord(eeRank)} among countries of citizenship` : ''}. ${h.n(cit.last)} people born in Nigeria took Canadian citizenship over the latest twelve months, ${h.ch(cit.change)} on the year before. Applicants living in Ghana, the United Kingdom or the United States read the time for that country on IRCC’s tool, since it follows residence, while every count on this page follows citizenship.</p>
 `,
   },
 });

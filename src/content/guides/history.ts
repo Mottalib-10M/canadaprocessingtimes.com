@@ -1,113 +1,112 @@
 import { defineGuide, type Helpers } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
 
-/* Archive des fichiers IRCC : nombre de relevés par fichier, plus grands écarts, tout lu dans history.json. */
-type F = 'country' | 'noncountry' | 'flpt' | 'tr';
-const FILES: F[] = ['country', 'noncountry', 'flpt', 'tr'];
-const cnt = (f: F) => K.readingsCount(f), arch = (f: F) => K.archivedCount(f), first = (f: F) => K.firstReading(f)!;
-const total = FILES.reduce((a, f) => a + cnt(f), 0);
-const totalArch = FILES.reduce((a, f) => a + arch(f), 0);
-const cDates = K.HIST.readings.country.map((r) => r.ircc);
-const lastOf = (f: F) => K.HIST.readings[f][K.HIST.readings[f].length - 1].ircc;
-const ve = K.fullTrend('n:visitor_extension')!, cs = K.fullTrend('n:cit_search')!, se = K.fullTrend('n:study_extension')!, we = K.fullTrend('n:work_extension')!;
-const sIN = K.fullTrend('c:study:IN')!, ng = K.fullTrend('c:visitor-outside-canada:NG')!, pgp = K.fullTrend('f:pgp-roc')!, npr = K.fullTrend('n:new_pr')!;
-const E = K.en, Fr = K.fr;
+/* Historique : volumes mensuels d'IRCC depuis janvier 2023 et résultats des normes de service sur deux exercices
+ * (données ouvertes, OGL-Canada 2.0). IRCC ne publie pas l'historique de ses délais de traitement en données ouvertes,
+ * et la page n'en reprend aucun. */
+const E = K.en, F = K.fr;
+type M = 'trIn' | 'trFin' | 'trOk' | 'v1' | 'spFin' | 'prIn' | 'copr' | 'cit';
+const METRICS: M[] = ['trIn', 'trFin', 'trOk', 'v1', 'spFin', 'prIn', 'copr', 'cit'];
+const YEARS = [...new Set(K.MONTHS.map((m) => m.slice(0, 4)))];
+const first = K.MONTHS[0], last = K.MONTHS[K.MONTHS.length - 1];
+const cy = YEARS[YEARS.length - 1], py = YEARS[YEARS.length - 2];
+const nCur = K.monthsOfYear(cy).length;
+const partial = nCur < 12;
+/* Même période de l'année d'avant : les nCur premiers mois. */
+const ytd = (m: M, y: string) => K.yearSum(K.full(m), K.MONTHS, y) == null ? null : K.monthsOfYear(y).slice(0, nCur).reduce((s, mm) => s + (K.full(m)[K.MONTHS.indexOf(mm)] ?? 0), 0);
+const ytdCh = (m: M) => { const a = ytd(m, cy), b = ytd(m, py); return a != null && b ? ((a - b) / b) * 100 : null; };
+const y = (m: M, yy: string) => K.fullYear(m, 'ALL', yy);
+const trInExt = K.fullExtremes('trIn'), citExt = K.fullExtremes('cit'), prExt = K.fullExtremes('prIn');
+const trIn0 = y('trIn', YEARS[0]), trIn1 = y('trIn', YEARS[YEARS.length - 2]);
+const trDown = trIn0 != null && trIn1 != null && trIn1 < trIn0;
+const citUp = ytdCh('cit'), prInCh = ytdCh('prIn'), trInCh = ytdCh('trIn');
 
-const NAME: Record<F, { en: string; fr: string }> = {
-  country: { en: 'By country (visas, permits, child sponsorship)', fr: 'Par pays (visas, permis, enfants parrainés)' },
-  noncountry: { en: 'Not by country (extensions, eTA, PR card, citizenship records)', fr: 'Sans pays (prolongations, AVE, carte RP, registres de citoyenneté)' },
-  flpt: { en: 'Forward-looking (permanent residence, citizenship)', fr: 'Prospectif (résidence permanente, citoyenneté)' },
-  tr: { en: 'Forward-looking by week (permit extensions)', fr: 'Prospectif par semaine (prolongations de permis)' },
-};
-function fileRows(h: Helpers) {
-  return FILES.map((f) => [NAME[f][h.lang], cnt(f), arch(f), h.day(first(f)), h.day(lastOf(f))]);
+/* Normes de service : les lignes publiées dans l'inventaire des services, sur les deux exercices disponibles. */
+const STD_IDS = ['eta', 'visitor', 'super-visa', 'study', 'study-inside', 'work', 'work-inside', 'cec', 'fsw', 'pnp-ee', 'pnp-base', 'qsw', 'spousal-out-roc', 'citizenship'];
+const stds = STD_IDS.map((id) => ({ id, s: K.stdOf(id)! })).filter((x) => x.s && x.s.prev);
+const met = (x: { cur?: { perf: number | null; target: number | null } | null }) => x.cur?.perf != null && x.cur.target != null && x.cur.perf >= x.cur.target * 100;
+const metCur = stds.filter((x) => met({ cur: x.s.cur })).length, metPrev = stds.filter((x) => met({ cur: x.s.prev })).length;
+const delta = (x: (typeof stds)[number]) => (x.s.cur.perf ?? 0) - (x.s.prev!.perf ?? 0);
+const best = [...stds].sort((a, b) => delta(b) - delta(a))[0], worst = [...stds].sort((a, b) => (a.s.cur.perf ?? 0) - (b.s.cur.perf ?? 0))[0];
+const fy = stds[0].s.fy, pfy = stds[0].s.pfy!;
+if (stds.some((x) => x.s.fy !== fy || x.s.pfy !== pfy)) throw new Error('history : les normes ne portent pas toutes sur les mêmes exercices');
+if (!(delta(best) > 0)) throw new Error('history : aucune norme ne progresse, réécrire le paragraphe');
+const lc = (x: string) => x.charAt(0).toLowerCase() + x.slice(1);
+const nm = (id: string, l: 'en' | 'fr') => (id === 'spousal-out-roc' ? (l === 'fr' ? 'Regroupement familial à l’étranger (époux, conjoints, enfants)' : 'Family class from abroad (spouses, partners, children)') : K.progName(id, l));
+
+function yearRows(h: Helpers, l: 'en' | 'fr') {
+  return METRICS.map((m) => [K.METRIC[m][l], ...YEARS.map((yy) => h.n(y(m, yy))), h.ch(ytdCh(m))]);
 }
-const MOVES: Array<[string, string, { en: string; fr: string }]> = [
-  ['n:visitor_extension', 'd', { en: 'Visitor record', fr: 'Fiche du visiteur' }],
-  ['n:cit_search', 'm', { en: 'Search of citizenship records', fr: 'Recherche dans les registres de citoyenneté' }],
-  ['n:study_extension', 'd', { en: 'Study permit extension (past time)', fr: 'Prolongation du permis d’études (délai passé)' }],
-  ['n:work_extension', 'd', { en: 'Work permit extension (past time)', fr: 'Prolongation du permis de travail (délai passé)' }],
-  ['c:study:IN', 'w', { en: 'Study permit, India', fr: 'Permis d’études, Inde' }],
-  ['c:visitor-outside-canada:NG', 'd', { en: 'Visitor visa, Nigeria', fr: 'Visa de visiteur, Nigeria' }],
-  ['f:pgp-roc', 'm', { en: 'Parents and grandparents, outside Quebec', fr: 'Parents et grands-parents, hors Québec' }],
-];
-function moveRows(h: Helpers) {
-  return MOVES.map(([s, u, n]) => { const t = K.fullTrend(s)!; return [n[h.lang], `${h.d(t.first!, u)} (${h.day(t.firstDate!)})`, `${h.d(t.min, u)} (${h.day(t.minDate)})`, `${h.d(t.max, u)} (${h.day(t.maxDate)})`, `${h.d(t.last, u)} (${h.day(t.lastDate)})`]; });
+function stdRows(h: Helpers, l: 'en' | 'fr') {
+  return stds.map((x) => [K.PAGE_OF[x.id] ? h.a(K.PAGE_OF[x.id], nm(x.id, l)) : nm(x.id, l), K.fmtStd(x.s.cur, l), h.pct(x.s.prev!.perf), h.pct(x.s.cur.perf), h.n(x.s.cur.total)]);
 }
 
 export default defineGuide({
   id: 'history', group: 'tools', order: 71,
   tool: 'delai', toolArg: { g: 'visitor-record', only: 'visitor-record,cit-search,study-ext,work-ext,study,visitor,pgp-roc' },
   related: ['method', 'visitor-record', 'citizenship', 'study-permit', 'nigeria', 'parents-grandparents'],
-  sources: ['wayback', 'ptimes-country', 'ptimes-noncountry', 'ptimes-flpt', 'ptimes-week', 'open-data'],
+  sources: ['open-data', 'od-std', 'od-pr', 'ptimes', 'ogl'],
   en: {
     slug: 'processing-time-history',
-    nav: 'History', card: 'Every dated reading, with the copy it comes from',
-    title: 'Processing Time History: Dated IRCC Readings, 2023 to 2026',
-    description: 'IRCC processing time history in 2026: every dated reading of the four IRCC files, the archived copy behind each point and the largest changes since 2023.',
-    h1: 'History of IRCC processing times',
-    intro: `${E.n(total)} dated readings of IRCC’s four processing time files, ${E.n(totalArch)} of them taken from Internet Archive copies.`,
-    resume: `Our archive holds ${E.n(total)} dated readings of the four files IRCC uses to publish processing times. The file without countries, which covers visitor records, permit extensions and citizenship records, goes back furthest: ${E.n(cnt('noncountry'))} readings since ${E.day(first('noncountry'))}. The country file has ${E.n(cnt('country'))} readings since ${E.day(first('country'))}, the forward-looking file for permanent residence and citizenship ${E.n(cnt('flpt'))} since ${E.day(first('flpt'))}, and the weekly file for permit extensions ${E.n(cnt('tr'))} since ${E.day(first('tr'))}. All but the latest reading of each file come from copies kept by the Internet Archive, each cited with its capture date. The largest change in the archive is the visitor record, which went from ${E.d(ve.first!)} on ${E.day(ve.firstDate!)} to a high of ${E.d(ve.max)} on ${E.day(ve.maxDate)}; it now stands at ${E.d(ve.last)}. Where no copy exists for a date, there is no point: nothing is filled in or smoothed.`,
+    nav: 'History', card: 'IRCC volumes month by month since 2023, and service standards year on year',
+    title: 'IRCC Workload History, Month by Month Since 2023 (2026)',
+    description: 'IRCC open data since January 2023: applications received, finalized and approved each year, new citizens, and how often IRCC met its service standards, 2026.',
+    h1: 'IRCC history: volumes since 2023 and service standards year on year',
+    intro: `IRCC’s monthly open data runs from ${E.my(first)} to ${E.my(last)}; IRCC publishes no history of its processing times.`,
+    resume: `This page brings together the history IRCC actually publishes as open data under the Open Government Licence of Canada. IRCC does not publish a history of its processing times: the “Check processing times” tool only shows today’s figure, so past times cannot be quoted from an official open source, and this page does not try. What IRCC does publish is monthly volumes, from ${E.my(first)} to ${E.my(last)}: temporary residence applications received, finalized and approved, visitor visas, study permits, permanent residence applications and admissions, and new citizens. In ${py}, it received ${E.n(y('trIn', py))} temporary residence applications and welcomed ${E.n(y('cit', py))} new citizens. The Government of Canada service inventory adds a second history: for each service standard, the share of applications IRCC processed on time. Of the ${E.n(stds.length)} standards shown below, IRCC met its target for ${E.n(metCur)} in ${K.fmtFy(fy, 'en')}, against ${E.n(metPrev)} in ${K.fmtFy(pfy, 'en')}.`,
     faqs: [
-      { q: 'Where do the older processing times on this site come from?', a: `From public copies of IRCC’s own files saved by the Internet Archive. ${E.n(totalArch)} of our ${E.n(total)} readings come from such copies; each table row links to the exact capture, so anyone can open it and check the figure. The latest reading of each file is taken directly from canada.ca on the date shown.` },
-      { q: 'Why does the country file have a gap between 2025 and July 2026?', a: `The Internet Archive kept very few copies of that file before mid 2026. We found readings dated ${E.day(cDates[0])} and ${E.day(cDates[1])}, then the next one is ${E.day(cDates[2])}. We do not estimate the months in between, so a country chart jumps from one real reading to the next.` },
-      { q: 'Why does permanent residence history start only in October 2025?', a: `IRCC switched permanent residence and citizenship to forward-looking times, published in a separate file. Our first copy of that file is dated ${E.day(first('flpt'))}, and it holds ${E.n(cnt('flpt'))} readings since. Older times for these programs were measured differently, so mixing them in would compare two different figures.` },
+      { q: 'Does IRCC publish past processing times?', a: 'Not as open data. The “Check processing times” tool on canada.ca shows the current figure only and replaces it when IRCC updates it. To follow your own file, note the time shown on the day you apply and keep it. The monthly volumes and the yearly service standard results on this page are the history IRCC does publish openly.' },
+      { q: 'Did IRCC receive fewer temporary residence applications after 2023?', a: `In ${YEARS[0]}, IRCC received ${E.n(trIn0)} temporary residence applications; in ${py}, ${E.n(trIn1)}. ${partial ? `For the first ${E.n(nCur)} months of ${cy}, receipts were ${E.ch(trInCh)} compared with the same months of ${py}.` : `In ${cy}, receipts changed by ${E.ch(trInCh)} on ${py}.`} The figures cover every temporary residence file, from visitor visas to work permit extensions.` },
+      { q: 'Which IRCC service standard improved the most recently?', a: `Between ${K.fmtFy(pfy, 'en')} and ${K.fmtFy(fy, 'en')}, the largest gain was for ${lc(nm(best.id, 'en'))}: ${E.pct(best.s.prev!.perf)} of applications processed within ${K.fmtStd(best.s.cur, 'en')}, then ${E.pct(best.s.cur.perf)}. The lowest result in ${K.fmtFy(fy, 'en')} was for ${lc(nm(worst.id, 'en'))}, at ${E.pct(worst.s.cur.perf)}, far below the target IRCC sets for itself.` },
     ],
     body: (h) => `
-<h2>Four files, four histories</h2>
-<p>IRCC does not publish a history of its processing times. Each file is overwritten when it is updated, so yesterday’s figure disappears from canada.ca. To rebuild a history, we read the copies of those files that the ${h.src('wayback', 'Internet Archive')} saved over time, keep the update date IRCC wrote inside each copy, and add a fresh reading of the live file. The table below counts what that gives for each file.</p>
-${h.table(['File', 'Readings', 'From archived copies', 'First reading', 'Latest reading'], fileRows(h), 'Dates are the update dates IRCC wrote in each file, not the dates the copies were made.', ['l', 'r', 'r', 'r', 'r'])}
-<p>The four files do not cover the same span. The ${h.src('ptimes-noncountry', 'file without countries')} was saved almost every week, which gives a dense series from ${h.day(first('noncountry'))}. The ${h.src('ptimes-country', 'country file')} was saved rarely before mid 2026: after ${h.day(cDates[0])} and ${h.day(cDates[1])}, the next copy is dated ${h.day(cDates[2])}. The ${h.src('ptimes-flpt', 'forward-looking file')} for permanent residence and citizenship starts on ${h.day(first('flpt'))}, and the ${h.src('ptimes-week', 'weekly extension file')} on ${h.day(first('tr'))}. A page on this site never shows a trend older than its file allows.</p>
-<h2>How a point is kept</h2>
-<p>Each reading carries two dates: the update date printed by IRCC in the file, which is the date shown in every table, and the date of the copy it comes from. The table rows link to that copy. When two copies carry the same IRCC date, only one is kept. When a copy is missing for a week or a month, the series simply has no point there; we do not draw a line between two readings and present it as data. The ${h.a('method', 'method page')} gives the full rules.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'visitor-record', m: 'none' }, t: 'Your application against its own history' })}
-<h2>The largest changes in the archive</h2>
-${h.table(['Series', 'First reading', 'Lowest', 'Highest', 'Latest'], moveRows(h), 'First, lowest, highest and latest values of a few series, with the IRCC date of each.', ['l', 'r', 'r', 'r', 'r'])}
-<p>The ${h.a('visitor-record', 'visitor record')} stands out. Visitors asking to stay longer waited ${h.d(ve.first!)} in the reading of ${h.day(ve.firstDate!)}; the figure rose to ${h.d(ve.max)} on ${h.day(ve.maxDate)} and was ${h.d(ve.last)} on ${h.day(ve.lastDate)}. The search of citizenship records, a step for people who need proof of an old file, went the same way after a low of ${h.d(cs.min, 'm')} on ${h.day(cs.minDate)}, reaching ${h.d(cs.max, 'm')} on ${h.day(cs.maxDate)}. See the ${h.a('citizenship', 'citizenship page')} for the grant itself, which has its own line.</p>
-${h.hist('n:visitor_extension', { max: 12, unit: 'd' })}
-<p>Extensions moved the other way. The past time for a study permit extension peaked at ${h.d(se.max)} on ${h.day(se.maxDate)} and fell to ${h.d(se.last)}; for a work permit extension the high was ${h.d(we.max)} on ${h.day(we.maxDate)}, against ${h.d(we.last)} now. First PR cards, at ${h.d(npr.last)}, sit between the low of ${h.d(npr.min)} and the high of ${h.d(npr.max)} seen since ${h.day(npr.firstDate!)}.</p>
-${h.hist('n:cit_search', { max: 12, unit: 'm' })}
-<h2>Countries and permanent residence</h2>
-<p>With only ${h.n(cnt('country'))} readings, country series are short but telling. A ${h.a('study-permit', 'study permit')} from India took ${h.d(sIN.first!, 'w')} on ${h.day(sIN.firstDate!)}, dropped to ${h.d(sIN.min, 'w')} on ${h.day(sIN.minDate)} and was ${h.d(sIN.last, 'w')} on ${h.day(sIN.lastDate)}. A visitor visa from ${h.a('nigeria', 'Nigeria')} went from ${h.d(ng.first!)} to ${h.d(ng.min)} on ${h.day(ng.minDate)}, then climbed back to ${h.d(ng.last)}.</p>
-${h.hist('c:study:IN', { max: 10, unit: 'w' })}
-<p>The forward-looking time for ${h.a('parents-grandparents', 'parents and grandparents')} outside Quebec shows how fast a planning figure can move: ${h.d(pgp.first!, 'm')} on ${h.day(pgp.firstDate!)}, ${h.d(pgp.max, 'm')} one reading later on ${h.day(pgp.maxDate)}, then ${h.d(pgp.last, 'm')} on ${h.day(pgp.lastDate)}.</p>
-${h.hist('f:pgp-roc', { max: 12, unit: 'm' })}
-<p>IRCC also releases monthly operational statistics on the ${h.src('open-data', 'Open Government portal')}. They count applications processed and inventories, not the published processing times, so they are not mixed into these series.</p>
+<h2>What history exists, and what does not</h2>
+<p>IRCC updates the times on its ${h.src('ptimes', '“Check processing times” tool')} regularly and keeps no public record of the previous figures. There is no open dataset of past processing times, so this page does not reconstruct one. If you want to compare, note the time IRCC shows on the day you apply: the calculator above takes that figure and the day IRCC received your file, and tells you where you stand today.</p>
+<p>Two official histories are open. The first is IRCC’s ${h.src('open-data', 'monthly operational data')}: how many applications came in, how many were decided and how many were approved, every month since ${h.my(first)}. The second is the ${h.src('od-std', 'service inventory')} of the Government of Canada, which reports each year how often IRCC met the processing standard it set for each service. Neither is a processing time, but together they show when the system was under pressure and whether it kept its own promises.</p>
+<h2>Year by year</h2>
+<p>The table sums each calendar year. ${partial ? `The last column is ${cy}, which only covers ${h.n(nCur)} months so far, so the change shown compares those months with the same months of ${py}.` : `The change column compares ${cy} with ${py}.`} Temporary residence covers visitor visas, visitor records, study and work permits and their extensions; permanent residence covers all economic, family and humanitarian classes.</p>
+${h.table(['Indicator', ...YEARS, partial ? `${cy} vs ${py}, same months` : `${cy} vs ${py}`], yearRows(h, 'en'), `IRCC open data, ${h.my(first)} to ${h.my(last)}${partial ? `; ${cy} covers ${h.n(nCur)} months` : ''}. Figures rounded to 5. Source: IRCC, Operational Processing and permanent residents datasets.`, ['l', ...YEARS.map(() => 'r' as const), 'r'])}
+<p>${trDown ? `Temporary residence receipts fell from ${h.n(trIn0)} in ${YEARS[0]} to ${h.n(trIn1)} in ${py}, a period that includes the cap IRCC placed on new study permits.` : `Temporary residence receipts went from ${h.n(trIn0)} in ${YEARS[0]} to ${h.n(trIn1)} in ${py}.`} The busiest single month for new temporary residence applications was ${h.my(trInExt.hi[0])}, with ${h.n(trInExt.hi[1])}, and the quietest ${h.my(trInExt.lo[0])}, with ${h.n(trInExt.lo[1])}. Permanent residence applications peaked in ${h.my(prExt.hi[0])} at ${h.n(prExt.hi[1])}. Citizenship moved on its own rhythm: the record month for new citizens was ${h.my(citExt.hi[0])}, with ${h.n(citExt.hi[1])}, and ${partial ? `the first ${h.n(nCur)} months of ${cy} are ${h.ch(citUp)} on the same months of ${py}` : `${cy} is ${h.ch(citUp)} on ${py}`}. Permanent residence receipts over the same comparison are ${h.ch(prInCh)}.</p>
+<h2>The last two years, month by month</h2>
+${h.months(K.MONTHS, [['TR received', K.full('trIn')], ['TR finalized', K.full('trFin')], ['PR received', K.full('prIn')], ['New citizens', K.full('cit')]], { max: 24, caption: 'IRCC monthly volumes, all countries (TR: temporary residence; PR: permanent residence). Source: IRCC open data; figures rounded to 5.' })}
+<p>A month where finalized files exceed received files is a month where the queue shrank; the reverse means it grew. That balance, more than any single figure, is what later shows up as a longer or shorter time on IRCC’s tool. A single month can also mislead: one large batch of decisions, or a pause in ceremonies, moves the figure without saying anything about the trend. That is why the yearly totals above come first, and why the table keeps two full years side by side.</p>
+<h2>Service standards, year on year</h2>
+<p>For each standard, IRCC sets a target, ${h.pct((stds[0].s.cur.target ?? 0) * 100)} of applications within the stated time, and reports the share it achieved. In ${K.fmtFy(fy, 'en')}, it met the target for ${h.n(metCur)} of these ${h.n(stds.length)} standards, against ${h.n(metPrev)} in ${K.fmtFy(pfy, 'en')}. The largest gain was for ${lc(nm(best.id, 'en'))}, up ${h.n(delta(best), 1)} percentage points; the weakest result was for ${lc(nm(worst.id, 'en'))}, at ${h.pct(worst.s.cur.perf)}.</p>
+${h.table(['Service', 'Standard', `Within standard, ${K.fmtFy(pfy, 'en')}`, `Within standard, ${K.fmtFy(fy, 'en')}`, `Applications, ${K.fmtFy(fy, 'en')}`], stdRows(h, 'en'), `IRCC service standards and results by fiscal year. Source: Government of Canada service inventory, open data.`, ['l', 'l', 'r', 'r', 'r'])}
+${h.mini('delai', { p: ['g', 'n', 'u', 'm', 'd'], d: { g: 'citizenship', m: 'none' }, t: 'Today’s time against the standard: your date' })}
+<p>A standard met for most applications still leaves a minority waiting longer, and those are the files people ask about. If yours is one of them, the guide to an ${h.a('beyond-processing-time', 'application past the processing time')} lists the checks to make before writing to IRCC.</p>
+<p>To go further for one country, the ${h.a('nigeria', 'Nigeria page')} and the other country pages break these volumes down by citizenship; the ${h.a('method', 'method page')} explains how each figure is read and rounded.</p>
 `,
   },
   fr: {
     slug: 'historique-delais',
-    nav: 'Historique', card: 'Chaque relevé daté, avec la copie d’où il vient',
-    title: 'Historique des délais IRCC : relevés datés depuis 2023, 2026',
-    description: 'Historique des délais de traitement d’IRCC en 2026 : chaque relevé daté des quatre fichiers, la copie archivée derrière chaque point et les plus grands écarts.',
-    h1: 'Historique des délais de traitement d’IRCC',
-    intro: `${Fr.n(total)} relevés datés des quatre fichiers de délais d’IRCC, dont ${Fr.n(totalArch)} tirés de copies de l’Internet Archive.`,
-    resume: `Notre archive contient ${Fr.n(total)} relevés datés des quatre fichiers dans lesquels IRCC publie ses délais de traitement. Le fichier sans pays, qui couvre la fiche du visiteur, les prolongations de permis et les registres de citoyenneté, remonte le plus loin : ${Fr.n(cnt('noncountry'))} relevés depuis le ${Fr.day(first('noncountry'))}. Le fichier par pays compte ${Fr.n(cnt('country'))} relevés depuis le ${Fr.day(first('country'))}, le fichier prospectif de la résidence permanente et de la citoyenneté ${Fr.n(cnt('flpt'))} depuis le ${Fr.day(first('flpt'))}, et le fichier hebdomadaire des prolongations ${Fr.n(cnt('tr'))} depuis le ${Fr.day(first('tr'))}. Sauf le dernier relevé de chaque fichier, tous viennent de copies conservées par l’Internet Archive, citées avec leur date de capture. Le plus grand écart de l’archive est celui de la fiche du visiteur, passée de ${Fr.d(ve.first!)} le ${Fr.day(ve.firstDate!)} à un sommet de ${Fr.d(ve.max)} le ${Fr.day(ve.maxDate)} ; elle est aujourd’hui à ${Fr.d(ve.last)}. Là où aucune copie n’existe, il n’y a pas de point : rien n’est complété ni lissé.`,
+    nav: 'Historique', card: 'Les volumes d’IRCC mois par mois depuis 2023, et les normes de service d’une année à l’autre',
+    title: 'Historique d’IRCC, volumes mois par mois depuis 2023 (2026)',
+    description: 'Données ouvertes d’IRCC depuis janvier 2023 : demandes reçues, finalisées et approuvées par année, nouveaux citoyens et normes de service tenues, édition 2026.',
+    h1: 'Historique d’IRCC : volumes depuis 2023 et normes de service d’une année à l’autre',
+    intro: `Les données ouvertes mensuelles d’IRCC vont de ${F.my(first)} à ${F.my(last)} ; IRCC ne publie aucun historique de ses délais de traitement.`,
+    resume: `Cette page rassemble l’historique qu’IRCC publie réellement en données ouvertes, sous la Licence du gouvernement ouvert du Canada. IRCC ne publie pas d’historique de ses délais de traitement : l’outil « Vérifier les délais de traitement » n’affiche que le chiffre du jour, si bien qu’aucun délai passé ne peut être cité d’après une source officielle ouverte, et cette page ne s’y essaie pas. Ce qu’IRCC publie, ce sont des volumes mensuels, de ${F.my(first)} à ${F.my(last)} : demandes de résidence temporaire reçues, finalisées et approuvées, visas de visiteur, permis d’études, demandes et admissions de résidence permanente, nouveaux citoyens. En ${py}, il a reçu ${F.n(y('trIn', py))} demandes de résidence temporaire et accueilli ${F.n(y('cit', py))} nouveaux citoyens. L’inventaire des services du gouvernement du Canada ajoute un second historique : pour chaque norme de service, la part des demandes traitées dans les temps. Sur les ${F.n(stds.length)} normes présentées plus bas, IRCC a atteint sa cible pour ${F.n(metCur)} en ${K.fmtFy(fy, 'fr')}, contre ${F.n(metPrev)} en ${K.fmtFy(pfy, 'fr')}.`,
     faqs: [
-      { q: 'D’où viennent les anciens délais affichés sur ce site ?', a: `De copies publiques des fichiers d’IRCC sauvegardées par l’Internet Archive. ${Fr.n(totalArch)} de nos ${Fr.n(total)} relevés viennent de ces copies ; chaque ligne de tableau renvoie à la capture exacte, que chacun peut ouvrir pour vérifier le chiffre. Le dernier relevé de chaque fichier est lu directement sur canada.ca à la date indiquée.` },
-      { q: 'Pourquoi le fichier par pays a-t-il un trou entre 2025 et juillet 2026 ?', a: `L’Internet Archive a gardé très peu de copies de ce fichier avant le milieu de 2026. Nous avons des relevés datés du ${Fr.day(cDates[0])} et du ${Fr.day(cDates[1])}, puis le suivant est du ${Fr.day(cDates[2])}. Les mois entre les deux ne sont pas estimés : une courbe par pays saute d’un vrai relevé au suivant.` },
-      { q: 'Pourquoi l’historique de la résidence permanente commence-t-il en octobre 2025 ?', a: `IRCC publie les délais de la résidence permanente et de la citoyenneté sous forme prospective, dans un fichier distinct. Notre première copie de ce fichier date du ${Fr.day(first('flpt'))} et nous en avons ${Fr.n(cnt('flpt'))} relevés depuis. Les anciens délais de ces programmes se mesuraient autrement : les mélanger reviendrait à comparer deux chiffres différents.` },
+      { q: 'IRCC publie-t-il les délais de traitement passés ?', a: 'Pas en données ouvertes. L’outil « Vérifier les délais de traitement » de canada.ca n’affiche que le chiffre en cours et le remplace à chaque mise à jour. Pour suivre votre dossier, notez le délai affiché le jour de la demande et gardez-le. Les volumes mensuels et les résultats annuels des normes de service de cette page sont l’historique qu’IRCC publie ouvertement.' },
+      { q: 'IRCC a-t-il reçu moins de demandes de résidence temporaire après 2023 ?', a: `En ${YEARS[0]}, IRCC a reçu ${F.n(trIn0)} demandes de résidence temporaire ; en ${py}, ${F.n(trIn1)}. ${partial ? `Sur les ${F.n(nCur)} premiers mois de ${cy}, l’écart des réceptions avec les mêmes mois de ${py} est le suivant : ${F.ch(trInCh)}.` : `En ${cy}, l’écart avec ${py} est de ${F.ch(trInCh)}.`} Ces chiffres couvrent tous les dossiers de résidence temporaire, du visa de visiteur à la prolongation de permis de travail.` },
+      { q: 'Quelle norme de service d’IRCC a le plus progressé récemment ?', a: `Entre ${K.fmtFy(pfy, 'fr')} et ${K.fmtFy(fy, 'fr')}, la plus forte hausse concerne la ligne ${lc(nm(best.id, 'fr'))} : ${F.pct(best.s.prev!.perf)} des demandes traitées en ${K.fmtStd(best.s.cur, 'fr')}, puis ${F.pct(best.s.cur.perf)}. Le résultat le plus faible en ${K.fmtFy(fy, 'fr')} est celui de la ligne ${lc(nm(worst.id, 'fr'))}, à ${F.pct(worst.s.cur.perf)}.` },
     ],
     body: (h) => `
-<h2>Quatre fichiers, quatre historiques</h2>
-<p>IRCC ne publie pas d’historique de ses délais. Chaque fichier est remplacé à sa mise à jour, et le chiffre de la veille disparaît de canada.ca. Pour reconstituer un historique, nous lisons les copies de ces fichiers que l’${h.src('wayback', 'Internet Archive')} a sauvegardées au fil du temps, nous gardons la date de mise à jour écrite par IRCC dans chaque copie et nous ajoutons un relevé récent du fichier en ligne. Le tableau compte ce que cela donne pour chaque fichier.</p>
-${h.table(['Fichier', 'Relevés', 'Tirés de copies archivées', 'Premier relevé', 'Dernier relevé'], fileRows(h), 'Les dates sont celles de mise à jour écrites par IRCC dans chaque fichier, pas celles des copies.', ['l', 'r', 'r', 'r', 'r'])}
-<p>Les quatre fichiers ne couvrent pas la même période. Le ${h.src('ptimes-noncountry', 'fichier sans pays')} a été sauvegardé presque chaque semaine, d’où une série dense depuis le ${h.day(first('noncountry'))}. Le ${h.src('ptimes-country', 'fichier par pays')} l’a été rarement avant le milieu de 2026 : après le ${h.day(cDates[0])} et le ${h.day(cDates[1])}, la copie suivante est datée du ${h.day(cDates[2])}. Le ${h.src('ptimes-flpt', 'fichier prospectif')} de la résidence permanente et de la citoyenneté commence le ${h.day(first('flpt'))}, et le ${h.src('ptimes-week', 'fichier hebdomadaire des prolongations')} le ${h.day(first('tr'))}. Aucune page du site ne montre une tendance plus ancienne que son fichier.</p>
-<h2>Comment un point est gardé</h2>
-<p>Chaque relevé porte deux dates : la date de mise à jour imprimée par IRCC dans le fichier, celle qui figure dans tous les tableaux, et la date de la copie d’où il vient. Les lignes des tableaux renvoient à cette copie. Quand deux copies portent la même date IRCC, une seule est gardée. Quand il manque une copie pour une semaine ou un mois, la série n’a simplement pas de point ; nous ne traçons pas de ligne entre deux relevés pour la présenter comme une donnée. La ${h.a('method', 'page de méthode')} donne les règles complètes.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'visitor-record', m: 'none' }, t: 'Votre demande face à son propre historique' })}
-<h2>Les plus grands écarts de l’archive</h2>
-${h.table(['Série', 'Premier relevé', 'Plus bas', 'Plus haut', 'Dernier'], moveRows(h), 'Valeur la plus ancienne, la plus basse, la plus haute et la dernière de quelques séries, avec la date IRCC de chacune.', ['l', 'r', 'r', 'r', 'r'])}
-<p>La ${h.a('visitor-record', 'fiche du visiteur')} se détache. Un visiteur qui demandait à rester plus longtemps attendait ${h.d(ve.first!)} au relevé du ${h.day(ve.firstDate!)} ; le chiffre a monté jusqu’à ${h.d(ve.max)} le ${h.day(ve.maxDate)} et il était de ${h.d(ve.last)} le ${h.day(ve.lastDate)}. La recherche dans les registres de citoyenneté, utile à qui doit prouver un ancien dossier, a suivi le même chemin après un creux de ${h.d(cs.min, 'm')} le ${h.day(cs.minDate)}, jusqu’à ${h.d(cs.max, 'm')} le ${h.day(cs.maxDate)}. L’attribution de la citoyenneté elle-même a sa propre ligne, sur la ${h.a('citizenship', 'page de la citoyenneté')}.</p>
-${h.hist('n:visitor_extension', { max: 12, unit: 'd' })}
-<p>Les prolongations ont évolué en sens inverse. Le délai passé d’une prolongation du permis d’études a culminé à ${h.d(se.max)} le ${h.day(se.maxDate)} avant de tomber à ${h.d(se.last)} ; pour une prolongation du permis de travail, le sommet était de ${h.d(we.max)} le ${h.day(we.maxDate)}, contre ${h.d(we.last)} aujourd’hui. La première carte RP, à ${h.d(npr.last)}, se situe entre le creux de ${h.d(npr.min)} et le sommet de ${h.d(npr.max)} observés depuis le ${h.day(npr.firstDate!)}.</p>
-${h.hist('n:cit_search', { max: 12, unit: 'm' })}
-<h2>Les pays et la résidence permanente</h2>
-<p>Avec ${h.n(cnt('country'))} relevés seulement, les séries par pays sont courtes mais parlantes. Un ${h.a('study-permit', 'permis d’études')} demandé depuis l’Inde prenait ${h.d(sIN.first!, 'w')} le ${h.day(sIN.firstDate!)}, il est descendu à ${h.d(sIN.min, 'w')} le ${h.day(sIN.minDate)} et il était de ${h.d(sIN.last, 'w')} le ${h.day(sIN.lastDate)}. Un visa de visiteur demandé depuis le ${h.a('nigeria', 'Nigeria')} est passé de ${h.d(ng.first!)} à ${h.d(ng.min)} le ${h.day(ng.minDate)}, puis il est remonté à ${h.d(ng.last)}.</p>
-${h.hist('c:study:IN', { max: 10, unit: 'w' })}
-<p>Le délai prospectif des ${h.a('parents-grandparents', 'parents et grands-parents')} hors Québec montre à quelle vitesse un chiffre de planification peut bouger : ${h.d(pgp.first!, 'm')} le ${h.day(pgp.firstDate!)}, ${h.d(pgp.max, 'm')} un relevé plus tard, le ${h.day(pgp.maxDate)}, puis ${h.d(pgp.last, 'm')} le ${h.day(pgp.lastDate)}.</p>
-${h.hist('f:pgp-roc', { max: 12, unit: 'm' })}
-<p>IRCC diffuse aussi chaque mois des statistiques opérationnelles sur le ${h.src('open-data', 'portail du gouvernement ouvert')}. Elles comptent les demandes traitées et les inventaires, pas les délais publiés : elles ne sont donc pas mêlées à ces séries.</p>
+<h2>Ce qui existe comme historique, et ce qui manque</h2>
+<p>IRCC met régulièrement à jour les délais de son ${h.src('ptimes', 'outil « Vérifier les délais de traitement »')} et ne garde aucune trace publique des chiffres précédents. Il n’existe pas de jeu de données ouvert des délais passés : cette page n’en reconstitue donc pas. Pour comparer, notez le délai qu’IRCC affiche le jour de votre demande : le calculateur ci-dessus prend ce chiffre et le jour où IRCC a reçu le dossier, et vous dit où vous en êtes aujourd’hui.</p>
+<p>Deux historiques officiels sont ouverts. Le premier, ce sont les ${h.src('open-data', 'données opérationnelles mensuelles')} d’IRCC : combien de demandes sont arrivées, combien ont été tranchées et combien approuvées, chaque mois depuis ${h.my(first)}. Le second, c’est l’${h.src('od-std', 'inventaire des services')} du gouvernement du Canada, qui indique chaque année à quelle fréquence IRCC a tenu la norme de traitement fixée pour chaque service. Aucun des deux n’est un délai, mais ensemble ils montrent quand le système était sous pression et s’il a tenu ses propres engagements.</p>
+<h2>Année par année</h2>
+<p>Le tableau additionne chaque année civile. ${partial ? `La dernière colonne, ${cy}, ne couvre encore que ${h.n(nCur)} mois : l’écart affiché compare donc ces mois aux mêmes mois de ${py}.` : `La colonne d’écart compare ${cy} à ${py}.`} La résidence temporaire regroupe les visas de visiteur, les fiches du visiteur, les permis d’études et de travail et leurs prolongations ; la résidence permanente couvre toutes les catégories économiques, familiales et humanitaires.</p>
+${h.table(['Indicateur', ...YEARS, partial ? `${cy} contre ${py}, mêmes mois` : `${cy} contre ${py}`], yearRows(h, 'fr'), `Données ouvertes d’IRCC, ${h.my(first)} à ${h.my(last)}${partial ? ` ; ${cy} couvre ${h.n(nCur)} mois` : ''}. Chiffres arrondis à 5. Source : IRCC, jeux Traitement opérationnel et résidents permanents.`, ['l', ...YEARS.map(() => 'r' as const), 'r'])}
+<p>${trDown ? `Les demandes de résidence temporaire reçues sont passées de ${h.n(trIn0)} en ${YEARS[0]} à ${h.n(trIn1)} en ${py}, une période qui comprend le plafond fixé par IRCC pour les nouveaux permis d’études.` : `Les demandes de résidence temporaire reçues sont passées de ${h.n(trIn0)} en ${YEARS[0]} à ${h.n(trIn1)} en ${py}.`} Le mois le plus chargé en nouvelles demandes de résidence temporaire a été ${h.my(trInExt.hi[0])}, avec ${h.n(trInExt.hi[1])}, et le plus calme ${h.my(trInExt.lo[0])}, avec ${h.n(trInExt.lo[1])}. Les demandes de résidence permanente ont culminé en ${h.my(prExt.hi[0])}, à ${h.n(prExt.hi[1])}. La citoyenneté suit son propre rythme : le mois record pour les nouveaux citoyens a été ${h.my(citExt.hi[0])}, avec ${h.n(citExt.hi[1])}, et ${partial ? `l’écart des ${h.n(nCur)} premiers mois de ${cy} avec les mêmes mois de ${py} est le suivant : ${h.ch(citUp)}` : `l’écart de ${cy} avec ${py} est le suivant : ${h.ch(citUp)}`}. Sur la même comparaison, l’écart pour les demandes de résidence permanente est le suivant : ${h.ch(prInCh)}.</p>
+<h2>Les deux dernières années, mois par mois</h2>
+${h.months(K.MONTHS, [['RT reçues', K.full('trIn')], ['RT finalisées', K.full('trFin')], ['RP reçues', K.full('prIn')], ['Nouveaux citoyens', K.full('cit')]], { max: 24, caption: 'Volumes mensuels d’IRCC, tous pays (RT : résidence temporaire ; RP : résidence permanente). Source : données ouvertes d’IRCC ; chiffres arrondis à 5.' })}
+<p>Un mois où les dossiers finalisés dépassent les dossiers reçus est un mois où la file a raccourci ; l’inverse veut dire qu’elle s’est allongée. Cet équilibre, plus qu’un chiffre isolé, est ce qui se traduit ensuite par un délai plus long ou plus court dans l’outil d’IRCC.</p>
+<h2>Les normes de service d’une année à l’autre</h2>
+<p>Pour chaque norme, IRCC fixe une cible, ${h.pct((stds[0].s.cur.target ?? 0) * 100)} des demandes dans le délai annoncé, et publie la part atteinte. En ${K.fmtFy(fy, 'fr')}, il a atteint la cible pour ${h.n(metCur)} de ces ${h.n(stds.length)} normes, contre ${h.n(metPrev)} en ${K.fmtFy(pfy, 'fr')}. La plus forte hausse concerne la ligne ${lc(nm(best.id, 'fr'))}, avec ${h.n(delta(best), 1)} points de pourcentage de plus ; le résultat le plus faible est celui de la ligne ${lc(nm(worst.id, 'fr'))}, à ${h.pct(worst.s.cur.perf)}.</p>
+${h.table(['Service', 'Norme', `Dans la norme, ${K.fmtFy(pfy, 'fr')}`, `Dans la norme, ${K.fmtFy(fy, 'fr')}`, `Demandes, ${K.fmtFy(fy, 'fr')}`], stdRows(h, 'fr'), `Normes de service d’IRCC et résultats par exercice. Source : inventaire des services du gouvernement du Canada, données ouvertes.`, ['l', 'l', 'r', 'r', 'r'])}
+${h.mini('delai', { p: ['g', 'n', 'u', 'm', 'd'], d: { g: 'citizenship', m: 'none', c: 'FR' }, t: 'Le délai du jour face à la norme : votre date' })}
+<p>Pour aller plus loin sur un pays, la ${h.a('nigeria', 'page Nigeria')} et les autres pages par pays détaillent ces volumes par citoyenneté ; la ${h.a('method', 'page de méthode')} explique comment chaque chiffre est lu et arrondi.</p>
 `,
   },
 });

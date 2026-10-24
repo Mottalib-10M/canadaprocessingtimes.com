@@ -1,71 +1,55 @@
-import { defineGuide, type Helpers } from '../../lib/page-types';
+import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
+import { dir, ord, studyYear, partial } from './_pays-en';
 
-/* India: every figure read from IRCC's country file and our dated archive at build time. */
+/* India: scale first, then the fall in study permits. Every figure comes from IRCC open data (OGL-Canada 2.0),
+ * by country of citizenship, computed at build time. */
 const C = 'IN';
-const D = K.L.dates.country;
 const E = K.en;
-const R = K.HIST.readings.country;
-const SER: Record<string, string> = { visitor: `c:visitor-outside-canada:${C}`, 'super-visa': `c:supervisa:${C}`, study: `c:study:${C}`, work: `c:work:${C}`, child: `c:child_dependent:${C}` };
-const t = (g: string, c = C) => K.readingOf(g, c).t;
-const unit = (g: string) => { const x = t(g); return x && 'u' in x ? x.u : 'd'; };
-const known = (g: string) => K.countriesOf(g).map((x) => K.daysOf(t(g, x))).filter((v): v is number => v != null).sort((a, b) => a - b);
-function rank(g: string): string {
-  const all = known(g), mine = K.daysOf(t(g));
-  if (mine == null) return 'not ranked';
-  const pos = all.filter((v) => v < mine).length + 1, tie = all.filter((v) => v === mine).length > 1;
-  const o = pos % 100 >= 11 && pos % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[pos % 10] ?? 'th';
-  return `${tie ? 'tied ' : 'the '}${pos === 1 ? '' : `${pos}${o} `}fastest of ${E.n(all.length)}`;
-}
-const mid = (g: string) => { const a = known(g); return a[Math.floor(a.length / 2)]; };
-const st = K.fullTrend(SER.study)!;
-const at = (s: string, d: string) => K.points(s).find((p) => p.date === d)?.v;
-const st2025 = at(SER.study, R[1].ircc)!;
-const inside = K.readingOf('study-inside');
-const ins = K.fullTrend(inside.series)!;
-const wk = K.fullTrend(SER.work)!, vi = K.fullTrend(SER.visitor)!, sv = K.fullTrend(SER['super-visa'])!, ch = K.fullTrend(SER.child)!;
-const ext = K.readingOf('study-ext');
-const move = (tr: { dir?: string }) => (tr.dir === 'up' ? 'up from' : tr.dir === 'down' ? 'down from' : 'close to');
-
-function lines(h: Helpers) {
-  return (['study', 'visitor', 'super-visa', 'work', 'child'] as const).map((g) => {
-    const tr = K.fullTrend(SER[g]);
-    return [h.a(K.PAGE_OF[g], K.progName(g, 'en')), h.t(t(g)), rank(g), tr?.firstDate ? `${h.d(tr.first!, unit(g))} (${h.day(tr.firstDate)})` : ''];
-  });
-}
+const fin = K.ops12('trFin', C), rin = K.ops12('trIn', C), ok = K.approval12(C), all = K.approval12();
+const v1 = K.ops12('v1', C), sp = K.ops12('spFin', C), pr = K.ops12('prIn', C), copr = K.ops12('copr', C), cit = K.ops12('cit', C);
+const finAll = K.ops12('trFin');
+const shareAll = K.pctOf(fin.last, finAll.last);
+const s23 = studyYear(C, '2023')!, s24 = studyYear(C, '2024')!, s25 = studyYear(C, '2025')!, s26 = studyYear(C, K.EE_CUR);
+const m26 = partial(K.EE_CUR);
+const stdS = K.stdOf('study')!;
+const eeF = K.eeCountry(K.EE_FULL, C), eeTop = K.eeTop(K.EE_FULL);
+const eeRank = eeTop.findIndex(([c]) => c === C) + 1;
+if (K.rank12('trFin', C).rank !== 1) throw new Error('india : le texte suppose l’Inde au 1er rang des demandes finalisées');
+if (K.rank12('v1', C).rank !== 1) throw new Error('india : le texte suppose l’Inde en tête des visas de visiteur');
+if (!(s25 < s23)) throw new Error('india : le texte suppose une baisse des permis d’études depuis 2023');
 
 export default defineGuide({
   id: 'india', group: 'countries', order: 100, country: C,
-  tool: 'delai', toolArg: { g: 'visitor', c: C, only: 'visitor,super-visa,study,work,child' },
+  tool: 'pays', toolArg: { c: C },
   related: ['study-permit', 'visitor-visa', 'super-visa', 'work-permit', 'dependent-child', 'study-permit-extension'],
-  sources: ['ptimes-country', 'study-permit', 'biometrics', 'visit', 'wayback'],
+  sources: ['open-data', 'od-study', 'od-std', 'od-ee', 'ptimes', 'study-permit', 'ogl'],
   en: {
     slug: 'processing-times-india',
-    nav: 'India', card: 'Study permit trend, visitor, work and family lines from India',
-    title: 'Study Permit and Visa Processing Times from India, 2026',
-    description: 'Canadian study permit, visitor visa, super visa, work permit and child sponsorship times for applicants in India in 2026, with each dated IRCC reading kept.',
-    h1: 'Processing times for applications filed from India',
-    intro: `IRCC’s country file of ${E.day(D)} puts a study permit from India at ${K.fmtTime(t('study'), 'en')}, against ${E.d(st.min, 'w')} at its lowest in our archive.`,
-    resume: `A study permit requested from India currently takes ${K.fmtTime(t('study'), 'en')}, according to the country file IRCC published on ${E.day(D)}. That places India ${rank('study')} countries with a published study figure, where the middle value is ${E.d(mid('study'), 'w')}. The line has moved a lot since 2024: our oldest copy, dated ${E.day(st.firstDate!)}, showed ${E.d(st.first!, 'w')}, the copy of ${E.day(R[1].ircc)} still showed ${E.d(st2025, 'w')}, and the figure fell to ${E.d(st.min, 'w')} on ${E.day(st.minDate)} before climbing back. The other lines from India read ${K.fmtTime(t('visitor'), 'en')} for a visitor visa, ${K.fmtTime(t('super-visa'), 'en')} for a super visa, ${K.fmtTime(t('work'), 'en')} for a work permit and ${K.fmtTime(t('child'), 'en')} for sponsoring a dependent child. Each is a past time: how long IRCC took to finish 80% of recent files from India, counted from the day it received a complete application, biometrics excluded. The tool above turns any of these lines into an estimated decision date.`,
+    nav: 'India', card: 'The largest volumes, study permits since 2023, visitor visas',
+    title: 'Visa and Permit Applications From India, 2026 Data',
+    description: 'Indian citizens file more Canadian visa and permit applications than any other nation: 2026 volumes, approval share and study permits, from IRCC open data.',
+    h1: 'Indian citizens and Canada: the largest line of applicants',
+    intro: `IRCC finalized ${E.n(fin.last)} temporary residence applications from Indian citizens from ${E.w12()}, more than for any other country.`,
+    resume: `Indian citizens are the largest group of applicants to Canada by a wide margin. From ${E.w12()}, IRCC finalized ${E.n(fin.last)} of their temporary residence applications, which covers visitor visas, visitor records, study and work permits and their extensions; that is ${E.pct(shareAll)} of all such files worldwide. ${E.pct(ok.rate)} of them ended in an approval, against ${E.pct(ok.prevRate)} over the twelve months before and ${E.pct(all.rate)} for all countries. The sharpest change is in study: ${E.n(s23)} study permits took effect for Indian citizens in 2023, ${E.n(s24)} in 2024 and ${E.n(s25)} in 2025. Visitor visas followed their own course, with ${E.n(v1.last)} approved over the latest twelve months (${E.ch(v1.change)}). These counts come from IRCC’s open data and say nothing about the processing time of your own file: for that, copy the time IRCC shows for the country you apply from and let the calculator date it.`,
     faqs: [
-      { q: 'Is the study permit time from India getting longer in 2026?', a: `Compared with its low point, yes. IRCC showed ${E.d(st.min, 'w')} on ${E.day(st.minDate)}, ${E.d(st.prev!, 'w')} on ${E.day(st.prevDate!)} and ${K.fmtTime(t('study'), 'en')} on ${E.day(D)}. That is still well below the ${E.d(st.first!, 'w')} of our ${E.day(st.firstDate!)} copy. A past time follows the files IRCC has just closed, so a rise means recent decisions took longer, not that your own file will.` },
-      { q: 'How does child sponsorship from India compare with other countries?', a: `Dependent child sponsorship has a published figure for only ${E.n(known('child').length)} countries. India, at ${K.fmtTime(t('child'), 'en')}, is ${rank('child')}. Our oldest copy, dated ${E.day(ch.firstDate!)}, showed ${E.d(ch.first!, 'm')}. The time runs from the day IRCC receives the complete sponsorship and permanent residence package.` },
-      { q: 'Does a work permit from India take longer than a study permit?', a: `On ${E.day(D)} it does: ${K.fmtTime(t('work'), 'en')} for a work permit against ${K.fmtTime(t('study'), 'en')} for a study permit. In our copy of ${E.day(wk.firstDate!)} the gap was wider, with ${E.d(wk.first!, 'w')} for work and ${E.d(st.first!, 'w')} for study. Both lines cover applications made from India, not from inside Canada.` },
+      { q: 'How many study permits does Canada give Indian students now?', a: `IRCC’s open data counts ${E.n(s25)} study permits that took effect for Indian citizens in 2025, after ${E.n(s23)} in 2023${s26 != null ? `, and ${E.n(s26)} from January to ${E.my(m26[m26.length - 1])}` : ''}. The count is of permits that started, by country of citizenship, so a student from India who applied from the United Arab Emirates is included.` },
+      { q: 'What share of Indian applications does IRCC approve?', a: `From ${E.w12()}, ${E.pct(ok.rate)} of the temporary residence files IRCC finalized for Indian citizens were approved. IRCC counts refusals and withdrawals among the files finalized, so the remainder is not a refusal rate. The share was ${E.pct(ok.prevRate)} over the twelve months before.` },
+      { q: 'How many Indian citizens were invited through Express Entry?', a: `IRCC’s open data on invited candidates counts ${E.n(eeF)} invitations to Indian citizens in ${K.EE_FULL}, ${eeRank === 1 ? 'the most of any country' : `the ${ord(eeRank)} highest`}. The figure covers every Express Entry program and comes from the yearly file IRCC updates each month; it does not tell you the score that would be needed in a future round.` },
     ],
     body: (h) => `
-<h2>The study permit line, reading by reading</h2>
-<p>This page puts the study permit first because its line from India has the clearest before and after in our archive. On ${h.day(D)} IRCC published ${h.t(t('study'))}, ${rank('study')} countries. The table below lists every dated reading our archive holds for this line, newest first, with the copy each one comes from.</p>
-${h.hist(SER.study, { max: 12, unit: 'w' })}
-<p>Read from the bottom up, the series tells a short story. In ${h.my(st.firstDate!)} the figure stood at ${h.d(st.first!, 'w')}, and in ${h.my(R[1].ircc)} at ${h.d(st2025, 'w')}. By ${h.day(R[2].ircc)} it had dropped to ${h.d(at(SER.study, R[2].ircc)!, 'w')}, and it still read ${h.d(at(SER.study, R[5].ircc)!, 'w')} on ${h.day(R[5].ircc)}. The latest figure, ${h.t(t('study'))}, is ${move(st)} the ${h.d(st.prev!, 'w')} of ${h.day(st.prevDate!)}. We do not know what happened between ${h.day(R[1].ircc)} and ${h.day(R[2].ircc)}: no copy of IRCC’s country file was archived in that stretch, so the table has no row there and we do not fill one in.</p>
-<h2>From India or from inside Canada</h2>
-<p>A student who is already in Canada, for example on a visitor record or with a work permit, can sometimes apply for a study permit from inside the country. That application uses a separate line, which IRCC lists under Canada in the same file. It currently reads ${h.t(inside.t)}, after ${h.d(ins.first!, 'w')} in our oldest copy. Once a student holds a permit, renewing it is an extension, a different request that IRCC times with a forward-looking queue; the latest figure is ${h.t(ext.t)} and the ${h.a('study-permit-extension', 'extension page')} explains how to read it.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'study', c: C, m: 'none' }, t: 'Your study permit from India: estimated decision date' })}
-<h2>The other four lines from India</h2>
-${h.table(['Application', 'Published time', 'Rank among countries', 'Oldest copy kept'], lines(h), `Applications filed from India, IRCC country file of ${h.day(D)}.`, ['l', 'r', 'l', 'r'])}
-<p>The visitor visa sits at ${h.t(t('visitor'))}. It peaked at ${h.d(vi.max)} on ${h.day(vi.maxDate)} and was at ${h.d(vi.min)} on ${h.day(vi.minDate)}, which shows how far one line can swing within two years. The super visa for parents and grandparents reads ${h.t(t('super-visa'))}, ${move(sv)} ${h.d(sv.prev!)} on ${h.day(sv.prevDate!)}. Work permits requested from India take ${h.t(t('work'))}, a long way below the ${h.d(wk.first!, 'w')} of ${h.my(wk.firstDate!)}. Dependent child sponsorship from India is ${rank('child')}, at ${h.t(t('child'))}.</p>
-<h2>What to check before you rely on a date</h2>
-<p>The clock starts on the day IRCC receives a complete application, which for an online file is the submission date. Most applicants must also give fingerprints and a photo at a visa application centre, as described on IRCC’s ${h.src('biometrics', 'biometrics page')}; the published time does not count the wait for that appointment. Requests for more documents, a medical exam or a police certificate also pause the file. Each of these explains why a decision can come after the date shown in the tool without anything being wrong.</p>
-<p>The country in the list is the place you apply from. An Indian citizen living in the United Arab Emirates or in the United Kingdom falls under that country’s figure, not India’s. The ${h.a('method', 'method page')} explains how we read and store each file.</p>
+<h2>The largest line of applicants</h2>
+<p>No other country comes close to India in IRCC’s open data. From ${h.w12()}, Indian citizens sent ${h.n(rin.last)} new temporary residence applications or extensions, and IRCC finalized ${h.n(fin.last)}, ${dir(fin.change, 'more', 'fewer', 'about as many')} than in the twelve months before (${h.ch(fin.change)}). Such volume shapes the wait of everyone filing from India: the offices handling these files decide hundreds of thousands of cases a year, and a small change in their intake shows up in the time IRCC displays for India on its ${h.src('ptimes', 'processing times tool')}.</p>
+<p>The calculator above is a country profile built from those monthly files. It compares the latest twelve months with the twelve before for each indicator IRCC publishes by citizenship, from visitor visas to new citizens. It does not give a processing time. When you need one, read it on IRCC’s tool for the country you apply from, which for most readers of this page is India, and enter it in the ${h.a('study-permit', 'study permit')} or ${h.a('visitor-visa', 'visitor visa')} calculator.</p>
+${h.months(K.MONTHS, [['Received', K.full('trIn', C)], ['Finalized', K.full('trFin', C)], ['Approved', K.full('trOk', C)]], { caption: 'Temporary residence applications of Indian citizens by month, newest first. Source: IRCC, Operational Processing, open data (Open Government Licence of Canada); figures rounded to 5.' })}
+<h2>Study permits since 2023</h2>
+<p>The study line explains most of the change. In 2023, ${h.n(s23)} study permits took effect for Indian citizens; in 2024 the figure fell to ${h.n(s24)} and in 2025 to ${h.n(s25)}. New study permit applications finalized by IRCC for Indian citizens follow the same path, with ${h.n(sp.last)} over the latest twelve months against ${h.n(sp.prev)} the year before. Fewer files reach IRCC because Canada now caps the number of new students and asks most of them for a provincial attestation letter.</p>
+<p>For the time itself, IRCC sets a national service standard of ${K.fmtStd(stdS.cur, 'en')} for a new study permit requested from outside Canada, and met it for ${h.pct(stdS.cur.perf)} of applications in ${K.fmtFy(stdS.fy, 'en')}. The time IRCC shows for India on any given week can sit above or below that target; the mini calculator below dates it from your filing day.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'study', c: C, m: 'none' }, t: 'Your study permit from India: estimated decision date' })}
+<h2>Visitors and families</h2>
+<p>Visitor visas move on their own path. IRCC approved ${h.n(v1.last)} visitor visas for Indian citizens over the latest twelve months, ${h.ch(v1.change)} on the year before, the largest number for any country of citizenship. Visitor visa approvals are counted by IRCC separately from the visas attached to a study or work permit. Longer stays go through the ${h.a('super-visa', 'super visa')}, and children joining a parent through the ${h.a('dependent-child', 'dependent child sponsorship')}.</p>
+<h2>Permanent residence and citizenship</h2>
+<p>On the permanent side, IRCC received ${h.n(pr.last)} permanent residence applications from Indian citizens over the same twelve months and issued ${h.n(copr.last)} confirmations or visas of permanent residence. In ${K.EE_FULL}, Express Entry invited ${h.n(eeF)} Indian citizens to apply. And ${h.n(cit.last)} people born in India became Canadian citizens, ${dir(cit.change, 'more', 'fewer', 'about as many')} than a year earlier. These are counts of people, rounded to the nearest 5 by IRCC; a month with 1 to 4 people is shown as suppressed rather than as a number.</p>
 `,
   },
 });

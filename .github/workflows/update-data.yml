@@ -1,12 +1,12 @@
-name: IRCC processing times update and deploy
+name: IRCC open data update and deploy
 
-# Chaque jour vers 9 h 30 (heure de l'Est) : IRCC met à jour ses fichiers de délais environ une fois par semaine,
-# sans jour fixe, et ses délais prospectifs environ une fois par mois. Le script relit les quatre fichiers et les
-# rondes d'Entrée express ; une nouvelle date publiée par IRCC ajoute un relevé daté à l'archive
-# (src/data/ircc/history.json), versionnée ici. Puis le site est reconstruit et publié sur GitHub Pages.
+# Chaque lundi vers 9 h 30 (heure de l'Est) : le script relit les jeux de données ouverts d'IRCC et du SCT publiés
+# sous la Licence du gouvernement ouvert du Canada (mises à jour mensuelles d'IRCC, résidents permanents, permis,
+# Entrée express, normes de service) et réécrit src/data/ogl/. Une relecture hebdomadaire suffit : les jeux sont
+# mensuels ou annuels. Puis le site est reconstruit et publié sur GitHub Pages.
 on:
   schedule:
-    - cron: "30 13 * * *"
+    - cron: "30 13 * * 1"
   push:
     branches: [main]
   workflow_dispatch:
@@ -41,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Read IRCC files (scheduled and manual runs)
+      - name: Read IRCC open data (scheduled and manual runs)
         if: github.event_name != 'push'
         run: npm run update-data
 
@@ -56,8 +56,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/data/ircc/ src/data/site-config.ts
-          git diff --cached --quiet || (git commit -m "Délais IRCC relus le $(date -u +%F)" && git push)
+          git add src/data/ogl/ src/data/site-config.ts
+          git diff --cached --quiet || (git commit -m "Données ouvertes IRCC relues le $(date -u +%F)" && git push)
 
       - uses: actions/upload-pages-artifact@v3
         with:

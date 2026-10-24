@@ -1,90 +1,91 @@
 import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
-import { tm, tr, rankText, median, lines, ser } from './_pays';
+import { dirEn, dirFr, ord, eeRank } from './_pays';
 
-/* Cameroun : un visa de visiteur sorti d'une attente de près d'un an, un super visa qui remonte, des enfants qui attendent. */
+/* Cameroun : données ouvertes d'IRCC par pays de citoyenneté (OGL-Canada 2.0), calculées au build. Angle : la
+ * résidence permanente et Entrée express pour les francophones, où le Cameroun pèse très lourd. */
 const C = 'CM';
-const D = K.L.dates.country;
 const E = K.en, F = K.fr;
-const vi = tr('visitor', C)!, sv = tr('super-visa', C)!, st = tr('study', C)!, ch = tr('child', C)!;
-const ft = (g: 'visitor' | 'super-visa' | 'study' | 'work' | 'child', l: 'en' | 'fr') => K.fmtTime(tm(g, C), l);
-const sv26 = K.points(ser('super-visa', C)).filter((p) => p.date >= '2026-01-01');
-const svLow = sv26.reduce((a, p) => (p.v < a.v ? p : a), sv26[0]);
-const childAll = K.countriesOf('child').filter((x) => K.daysOf(K.readingOf('child', x).t) != null).length;
+const pr = K.ops12('prIn', C), co = K.ops12('copr', C), sp = K.ops12('spFin', C), v1 = K.ops12('v1', C), tf = K.ops12('trFin', C), ci = K.ops12('cit', C);
+const a = K.approval12(C), all = K.approval12();
+const rPr = K.rank12('prIn', C), rCo = K.rank12('copr', C);
+const YRS = ['2023', '2024', K.EE_FULL, K.EE_CUR].filter((y, i, s) => s.indexOf(y) === i);
+const ee = K.eeCountry(K.EE_FULL, C), eeR = eeRank(K.EE_FULL, C), ee0 = K.eeCountry('2023', C), eeCur = K.eeCountry(K.EE_CUR, C);
+const nCur = K.monthsOfYear(K.EE_CUR).length;
+const eeAll = K.eeTop(K.EE_FULL, 500).reduce((s, [, n]) => s + n, 0), eeSh = K.pctOf(ee, eeAll);
+const sCec = K.stdOf('cec')!, sFsw = K.stdOf('fsw')!, sChild = K.stdOf('child')!;
+const prY = (y: string) => K.fullYear('prIn', C, y);
+// « parmi les tout premiers pays » n'est vrai que si le Cameroun reste dans les cinq premiers pour les invitations.
+if (!(eeR != null && eeR <= 5)) throw new Error('cameroon : le Cameroun n’est plus dans les cinq premiers pays invités par Entrée express, réécrire');
+if (!(rPr.rank != null && rPr.rank <= 5)) throw new Error('cameroon : le Cameroun n’est plus dans les cinq premiers pays pour la résidence permanente, réécrire « peu de pays »');
 
 export default defineGuide({
   id: 'cameroon', group: 'countries', order: 112, country: C,
-  tool: 'delai', toolArg: { g: 'visitor', c: C, only: 'visitor,super-visa,study,work,child' },
+  tool: 'pays', toolArg: { c: C },
   related: ['visitor-visa', 'super-visa', 'dependent-child', 'study-permit', 'algeria', 'haiti'],
-  sources: ['ptimes-country', 'visit', 'super-visa', 'spouse', 'wayback'],
+  sources: ['ptimes', 'open-data', 'od-pr', 'od-ee', 'od-std', 'express-entry', 'study-permit', 'ogl'],
   en: {
     slug: 'processing-times-cameroon',
-    nav: 'Cameroon', card: 'Visitor visa down from almost a year, super visa rising, children',
-    title: 'Visitor Visa and Super Visa Times from Cameroon, 2026',
-    description: 'Canadian visitor visa, super visa, study permit, work permit and child sponsorship times for applicants in Cameroon in 2026, with IRCC readings since 2024.',
-    h1: 'Processing times for applications filed from Cameroon',
-    intro: `A visitor visa from Cameroon takes ${ft('visitor', 'en')} in IRCC’s file of ${E.day(D)}, against ${E.d(vi.max)} in the copy of ${E.day(vi.maxDate)}.`,
-    resume: `Applications filed from Cameroon currently read ${ft('visitor', 'en')} for a visitor visa, ${ft('super-visa', 'en')} for a super visa, ${ft('study', 'en')} for a study permit, ${ft('work', 'en')} for a work permit and ${ft('child', 'en')} for sponsoring a dependent child, in IRCC’s country file of ${E.day(D)}. The visitor visa is the striking line: our copies dated ${E.day(vi.firstDate!)} and ${E.day(vi.maxDate)} showed ${E.d(vi.first!)} and ${E.d(vi.max)}, close to a year, while every reading since July 2026 has been under two months. The super visa moves the other way, from ${E.d(svLow.v)} on ${E.day(svLow.date)} to ${E.d(sv.last)} today, which puts Cameroon ${rankText('super-visa', C, 'en')} countries with a figure. Children sponsored from Cameroon wait ${ft('child', 'en')}, one of only ${E.n(childAll)} countries with a published child time. These are past times, the delay within which 80% of recent files were decided, counted from receipt of a complete application and excluding biometrics.`,
+    nav: 'Cameroon', card: 'Permanent residence and Express Entry for French-speaking Cameroonians',
+    title: 'Cameroonian Applicants: IRCC Permanent Residence 2026',
+    description: 'Cameroonian citizens in IRCC open data for 2026: permanent residence applications, Express Entry invitations to French speakers, study and visitor files.',
+    h1: 'Applications to Canada by Cameroonian citizens',
+    intro: `IRCC received ${E.n(pr.last)} permanent residence applications from Cameroonian citizens from ${E.w12()}, ${E.ch(pr.change)} on the year before.`,
+    resume: `Cameroon stands out in IRCC’s open data for permanent residence rather than visits. From ${E.w12()}, the department received ${E.n(pr.last)} permanent residence applications from Cameroonian citizens, which ranks Cameroon ${ord(rPr.rank, 'en')} of ${E.n(rPr.of)} countries of citizenship, and issued ${E.n(co.last)} confirmations and visas of permanent residence (${ord(rCo.rank, 'en')}). Express Entry drives much of it: ${E.n(ee)} Cameroonians were invited in ${K.EE_FULL}, ${E.pct(eeSh)} of all invitations and the ${ord(eeR, 'en')} highest count by citizenship, helped by rounds for strong French speakers. On the temporary side, IRCC approved ${E.pct(a.rate)} of the files it finalized, against ${E.pct(a.prevRate)} a year earlier and ${E.pct(all.rate)} for all countries. Waiting times are the ones IRCC’s tool shows for the country you apply from; the calculator converts them into a date.`,
     faqs: [
-      { q: 'Why did the visitor visa from Cameroon take almost a year in 2024?', a: `IRCC does not explain individual lines. What its files show is ${E.d(vi.first!)} on ${E.day(vi.firstDate!)} and ${E.d(vi.max)} on ${E.day(vi.maxDate)}, then readings under two months from July 2026. The archive has no copy between March 2025 and July 2026, so the timing of the drop inside that gap is not known and is not drawn.` },
-      { q: 'How long does a super visa take from Cameroon now?', a: `${ft('super-visa', 'en')} in IRCC’s file of ${E.day(D)}, up from ${E.d(svLow.v)} in the reading of ${E.day(svLow.date)}. The rise has lasted several weekly readings. The host in Canada must show income above the required threshold and the parent needs private medical insurance, so start gathering those documents before applying.` },
-      { q: 'How long does it take to sponsor a child living in Cameroon?', a: `IRCC publishes ${ft('child', 'en')} for dependent children sponsored from Cameroon, counted from the day it receives the complete sponsorship and permanent residence application. Only ${E.n(childAll)} countries have a published figure for this line; the others are marked as not having enough data.` },
+      { q: 'Why are so many Cameroonians invited through Express Entry?', a: `IRCC invited ${E.n(ee)} Cameroonian citizens in ${K.EE_FULL}, against ${E.n(ee0)} in 2023. Many candidates educated in Cameroon are fluent in French, and IRCC runs category rounds for strong French speakers with lower score cut-offs than general rounds. Many of those invited were already in Canada as students or workers, which adds Canadian experience points.` },
+      { q: 'How long does Express Entry take for a Cameroonian candidate?', a: `IRCC’s service standard for Express Entry is ${K.fmtStd(sCec.cur, 'en')} after a complete application, met for ${E.pct(sCec.cur.perf)} of Canadian Experience Class files and ${E.pct(sFsw.cur.perf)} of Federal Skilled Worker files in ${K.fmtFy(sCec.fy, 'en')}. The time IRCC currently shows is on its processing times tool; the standard is the same whatever your citizenship.` },
+      { q: 'Does a Cameroonian already in Canada count as Cameroon in these figures?', a: 'Yes. IRCC’s open data count applicants by country of citizenship, wherever they live. The processing times tool works differently: it asks where you apply from, and applicants inside Canada read the Canadian line. A Cameroonian student applying for permanent residence from Montreal counts here as Cameroonian.' },
     ],
     body: (h) => `
-<h2>Every line from Cameroon</h2>
-${lines(h, C, ['visitor', 'super-visa', 'study', 'work', 'child'])}
-<h2>The visitor visa after the long wait</h2>
-<p>The two oldest copies of IRCC’s country file we could find tell of a very long wait: ${h.d(vi.first!)} on ${h.day(vi.firstDate!)}, then ${h.d(vi.max)} on ${h.day(vi.maxDate)}. A family member invited for a graduation or a birth could not plan around such a delay. The next copy we have dates from July 2026 and shows a different line altogether, under two months, and the weekly readings since have stayed there. At ${h.t(tm('visitor', C))}, Cameroon now ranks ${rankText('visitor', C, 'en')} countries.</p>
-${h.hist(ser('visitor', C), { max: 10 })}
-<p>Between ${h.day(vi.maxDate)} and July 2026 there is no copy, so the archive draws nothing: the drop happened somewhere in that span, and the site does not guess when.</p>
-${h.mini('delai', { p: ['m'], d: { g: 'visitor', c: C, m: 'none' }, t: 'Visitor visa from Cameroon: your date' })}
-<h2>A super visa that is getting slower</h2>
-<p>Parents and grandparents applying for the ${h.a('super-visa', 'super visa')} from Cameroon face the opposite trend. The line was ${h.d(svLow.v)} on ${h.day(svLow.date)} and has risen at most readings since, to ${h.d(sv.last)}. The middle value among countries is ${h.d(median('super-visa'))}. A family that wants a parent in Canada for a specific date can apply for an ordinary visitor visa instead, which is currently faster, at the cost of shorter stays.</p>
-${h.hist(ser('super-visa', C), { max: 8 })}
-<h2>Children and students</h2>
-<p>Sponsoring a dependent child who lives in Cameroon takes ${h.t(tm('child', C))}, ${rankText('child', C, 'en')} countries with a published figure; the line read ${h.d(ch.first!, 'm')} in our oldest copy, dated ${h.day(ch.firstDate!)}. That time covers the whole permanent residence file, from receipt to decision. The ${h.a('dependent-child', 'dependent child page')} compares it with other countries.</p>
-<p>A study permit takes ${h.t(tm('study', C))}, ${rankText('study', C, 'en')} countries, after ${h.d(st.first!, 'w')} on ${h.day(st.firstDate!)}. Students admitted in Quebec also need the CAQ before applying to IRCC.</p>
-<h2>Work permits</h2>
-<p>A work permit requested from Cameroon takes ${h.t(tm('work', C))}, ${rankText('work', C, 'en')} countries. In the copy of ${h.day(tr('work', C)!.firstDate!)} it read ${h.d(tr('work', C)!.first!, 'w')}, so this line too is far shorter than in 2024. Most permits tied to a job need the employer’s Labour Market Impact Assessment first, and caregivers, farm workers and francophone workers hired outside Quebec each have their own route; the published time starts only once IRCC holds the complete application.</p>
-<h2>Using the estimate</h2>
-<p>Pick the line and the month IRCC received your file. The result adds the published time and tells you whether that date is still ahead. Because the Cameroon lines have moved so much, look at the change since the previous reading as well: a time that rose last week may keep rising for a while, and the date you get today may slip.</p>
-<h2>Residence decides the line</h2>
-<p>Cameroonians who live legally in another country, such as Nigeria, Côte d’Ivoire or France, usually apply from there and fall under that country’s figure. The tool lets you switch between countries to see the difference before you file.</p>
+<h2>A leading source of new permanent residents</h2>
+<p>Few countries send as many permanent residence applications to IRCC as Cameroon. The operational processing tables count ${h.n(pr.last)} applications received from Cameroonian citizens over the latest twelve months, ${dirEn(pr.change)} ${h.pa(pr.change)}, and ${h.n(co.last)} confirmations and visas of permanent residence issued. In calendar years, applications received went from ${h.n(prY('2023'))} in 2023 to ${h.n(prY(K.EE_FULL))} in ${K.EE_FULL}. Cameroonians apply through Express Entry, through provincial nominee programs, through Quebec and through family sponsorship, often for a ${h.a('dependent-child', 'dependent child')} left in Cameroon.</p>
+<p>For family files, IRCC’s standard for a dependent child abroad is ${K.fmtStd(sChild.cur, 'en')}, met for ${h.pct(sChild.cur.perf)} of applications nationally in ${K.fmtFy(sChild.fy, 'en')}. The standard is national; the time for your own file is on IRCC’s ${h.src('ptimes', 'Check processing times tool')}.</p>
+<h2>Express Entry and French speakers</h2>
+<p>The ${h.src('od-ee', 'invited candidates open data')} show how fast Cameroon rose: invitations went from ${h.n(ee0)} in 2023 to ${h.n(ee)} in ${K.EE_FULL}, and the first ${nCur} months of ${K.EE_CUR} already count ${h.n(eeCur)}. In ${K.EE_FULL}, Cameroon ranked ${ord(eeR, 'en')} among countries of citizenship. Rounds for strong French speakers, with lower cut-off scores, reward the bilingual profile of many Cameroonian graduates; candidates already studying or working in Canada add Canadian experience on top.</p>
+${h.table(['Year', 'Cameroonians invited', 'Rank by citizenship'], YRS.map((y) => [y === K.EE_CUR ? `${y} (${nCur} months)` : y, h.n(K.eeCountry(y, C)), ord(eeRank(y, C), 'en')]), 'Express Entry invitations to Cameroonian citizens. Source: IRCC, Express Entry invited candidates, open data; figures rounded to 5.', ['l', 'r', 'r'])}
+<p>Once invited, a candidate files the permanent residence application. IRCC aims to decide ${h.a('express-entry', 'Express Entry')} files within ${K.fmtStd(sCec.cur, 'en')}; enter the time its tool shows and the date IRCC received your file here.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'cec', c: C, m: 'none' }, t: 'Express Entry for a Cameroonian candidate: estimated decision date' })}
+<h2>Temporary files: studies and visits</h2>
+<p>IRCC finalized ${h.n(tf.last)} temporary residence applications from Cameroonian citizens over twelve months and approved ${h.pct(a.rate)} of them, a share ${dirEn(a.rate != null && a.prevRate != null ? a.rate - a.prevRate : null)} from ${h.pct(a.prevRate)}. New study permit applications finalized fell to ${h.n(sp.last)}, ${dirEn(sp.change)} ${h.pa(sp.change)}, after the national cap on study permits. Visitor visas approved reached ${h.n(v1.last)}. The approved share counts withdrawn files as finalized, so read it as a trend, not a refusal rate.</p>
+${h.months(K.MONTHS, [['PR applications received', K.full('prIn', C)], ['PR authorizations issued', K.full('copr', C)], ['Study permits finalized', K.full('spFin', C)]], { caption: 'Cameroonian citizens, by month. Source: IRCC, Operational Processing, open data; figures rounded to 5.' })}
+<p>${h.n(ci.last)} people born in Cameroon became Canadian citizens over the latest twelve months. The ${h.a('haiti', 'Haiti')} and ${h.a('algeria', 'Algeria')} pages show two other French-speaking countries with different profiles.</p>
+<h2>Two ways of counting a country</h2>
+<p>IRCC’s processing times tool asks for the country you apply from; its open data count citizens. Many Cameroonians apply for permanent residence from inside Canada, so they read the Canadian line on the tool while appearing under Cameroon here.</p>
+<h2>What slows a Cameroonian file</h2>
+<p>For applicants still in Cameroon, biometrics are taken at the visa application centre in Yaoundé, and the closest IRCC office handling the file may be abroad. Civil status documents are a frequent stumbling block: birth and marriage certificates must be consistent across the whole application, and IRCC may ask to verify them. For Express Entry, a police certificate from every country where you lived six months or more is required before you file. Gathering these papers before an invitation arrives avoids losing part of the sixty days IRCC gives to submit.</p>
 `,
   },
   fr: {
     slug: 'delais-cameroun',
-    nav: 'Cameroun', card: 'Visa de visiteur sorti d’une attente de près d’un an, super visa en hausse, enfants',
-    title: 'Délai visa visiteur et super visa depuis le Cameroun, 2026',
-    description: 'Délais canadiens du visa de visiteur, du super visa, des permis d’études et de travail et du parrainage d’enfant depuis le Cameroun en 2026, relevés IRCC datés.',
-    h1: 'Délais des demandes déposées depuis le Cameroun',
-    intro: `Un visa de visiteur depuis le Cameroun prend ${ft('visitor', 'fr')} dans le fichier d’IRCC du ${F.day(D)}, contre ${F.d(vi.max)} dans la copie du ${F.day(vi.maxDate)}.`,
-    resume: `Les demandes déposées depuis le Cameroun indiquent en ce moment ${ft('visitor', 'fr')} pour un visa de visiteur, ${ft('super-visa', 'fr')} pour un super visa, ${ft('study', 'fr')} pour un permis d’études, ${ft('work', 'fr')} pour un permis de travail et ${ft('child', 'fr')} pour le parrainage d’un enfant à charge, d’après le fichier par pays d’IRCC du ${F.day(D)}. Le visa de visiteur est la ligne la plus frappante : nos copies du ${F.day(vi.firstDate!)} et du ${F.day(vi.maxDate)} indiquaient ${F.d(vi.first!)} et ${F.d(vi.max)}, près d’un an, alors que chaque relevé depuis juillet 2026 est sous les deux mois. Le super visa va dans l’autre sens, de ${F.d(svLow.v)} le ${F.day(svLow.date)} à ${F.d(sv.last)} aujourd’hui, ce qui place le Cameroun au ${rankText('super-visa', C, 'fr')} pays chiffrés. Un enfant parrainé depuis le Cameroun attend ${ft('child', 'fr')}, l’un des ${F.n(childAll)} seuls pays qui ont un délai publié pour cette ligne. Ce sont des délais passés, le temps dans lequel 80 % des dossiers récents ont été tranchés, compté à partir de la réception d’une demande complète, sans la biométrie.`,
+    nav: 'Cameroun', card: 'Résidence permanente et Entrée express des Camerounais francophones',
+    title: 'Demandes des Camerounais : résidence permanente IRCC 2026',
+    description: 'Les citoyens camerounais dans les données ouvertes d’IRCC en 2026 : résidence permanente, invitations Entrée express des francophones, études et visites.',
+    h1: 'Les demandes des citoyens camerounais au Canada',
+    intro: `IRCC a reçu ${F.n(pr.last)} demandes de résidence permanente de citoyens camerounais de ${F.w12()}, soit ${F.ch(pr.change)} sur un an.`,
+    resume: `Le Cameroun se distingue dans les données ouvertes d’IRCC par la résidence permanente plus que par les visites. De ${F.w12()}, le ministère a reçu ${F.n(pr.last)} demandes de résidence permanente de citoyens camerounais, ce qui place le Cameroun au ${ord(rPr.rank, 'fr')} rang sur ${F.n(rPr.of)} pays de citoyenneté, et a délivré ${F.n(co.last)} confirmations et visas de résidence permanente (${ord(rCo.rank, 'fr')} rang). Entrée express en explique une grande part : ${F.n(ee)} Camerounais ont été invités en ${K.EE_FULL}, soit ${F.pct(eeSh)} de toutes les invitations et le ${ord(eeR, 'fr')} total par citoyenneté, grâce notamment aux rondes réservées aux francophones. Côté temporaire, IRCC a approuvé ${F.pct(a.rate)} des dossiers finalisés, contre ${F.pct(a.prevRate)} un an plus tôt et ${F.pct(all.rate)} tous pays confondus. Les délais sont ceux que l’outil d’IRCC affiche pour le pays depuis lequel vous déposez ; le calculateur les convertit en date.`,
     faqs: [
-      { q: 'Pourquoi le visa de visiteur depuis le Cameroun prenait-il près d’un an en 2024 ?', a: `IRCC n’explique pas ses lignes une à une. Ses fichiers montrent ${F.d(vi.first!)} le ${F.day(vi.firstDate!)} et ${F.d(vi.max)} le ${F.day(vi.maxDate)}, puis des relevés sous les deux mois à partir de juillet 2026. L’archive n’a aucune copie entre mars 2025 et juillet 2026 : le moment de la baisse dans cet intervalle n’est pas connu et n’est pas tracé.` },
-      { q: 'Combien de temps prend un super visa depuis le Cameroun aujourd’hui ?', a: `${ft('super-visa', 'fr')} dans le fichier d’IRCC du ${F.day(D)}, contre ${F.d(svLow.v)} au relevé du ${F.day(svLow.date)}. La hausse dure depuis plusieurs relevés hebdomadaires. L’hôte au Canada doit prouver un revenu au-dessus du seuil exigé et le parent doit avoir une assurance médicale privée : réunissez ces pièces avant de déposer.` },
-      { q: 'Combien de temps pour parrainer un enfant qui vit au Cameroun ?', a: `IRCC publie ${ft('child', 'fr')} pour un enfant à charge parrainé depuis le Cameroun, à compter de la réception de la demande complète de parrainage et de résidence permanente. Seuls ${F.n(childAll)} pays ont un chiffre publié pour cette ligne ; les autres sont marqués comme manquant de données.` },
+      { q: 'Pourquoi autant de Camerounais sont-ils invités par Entrée express ?', a: `IRCC a invité ${F.n(ee)} citoyens camerounais en ${K.EE_FULL}, contre ${F.n(ee0)} en 2023. Beaucoup de candidats formés au Cameroun parlent couramment français, et IRCC organise des rondes par catégorie pour les francophones avec des seuils plus bas que les rondes générales. Bon nombre d’invités étaient déjà au Canada comme étudiants ou travailleurs, ce qui ajoute des points d’expérience canadienne.` },
+      { q: 'Combien de temps prend Entrée express pour un candidat camerounais ?', a: `La norme de service d’IRCC pour Entrée express est de ${K.fmtStd(sCec.cur, 'fr')} après une demande complète ; elle a été tenue pour ${F.pct(sCec.cur.perf)} des dossiers de la catégorie de l’expérience canadienne et ${F.pct(sFsw.cur.perf)} des travailleurs qualifiés du fédéral en ${K.fmtFy(sCec.fy, 'fr')}. Le délai actuel se lit dans l’outil d’IRCC ; la norme est la même quelle que soit la citoyenneté.` },
+      { q: 'Un Camerounais déjà au Canada compte-t-il pour le Cameroun dans ces chiffres ?', a: 'Oui. Les données ouvertes d’IRCC comptent les demandeurs par pays de citoyenneté, où qu’ils vivent. L’outil des délais fonctionne autrement : il demande d’où vous déposez, et les demandeurs au Canada lisent la ligne canadienne. Un étudiant camerounais qui demande la résidence permanente depuis Montréal compte ici comme Camerounais.' },
     ],
     body: (h) => `
-<h2>Toutes les lignes depuis le Cameroun</h2>
-${lines(h, C, ['visitor', 'super-visa', 'study', 'work', 'child'])}
-<h2>Le visa de visiteur après la longue attente</h2>
-<p>Les deux plus anciennes copies du fichier par pays d’IRCC que nous avons trouvées racontent une très longue attente : ${h.d(vi.first!)} le ${h.day(vi.firstDate!)}, puis ${h.d(vi.max)} le ${h.day(vi.maxDate)}. Un parent invité pour une remise de diplôme ou une naissance ne pouvait pas s’organiser avec un tel délai. La copie suivante date de juillet 2026 et montre une tout autre ligne, sous les deux mois, et les relevés hebdomadaires depuis y sont restés. À ${h.t(tm('visitor', C))}, le Cameroun se classe au ${rankText('visitor', C, 'fr')} pays.</p>
-${h.hist(ser('visitor', C), { max: 10 })}
-<p>Entre le ${h.day(vi.maxDate)} et juillet 2026, il n’existe aucune copie : l’archive ne trace rien. La baisse a eu lieu quelque part dans cet intervalle, et le site ne devine pas quand.</p>
-${h.mini('delai', { p: ['m'], d: { g: 'visitor', c: C, m: 'none' }, t: 'Visa de visiteur depuis le Cameroun : votre date' })}
-<h2>Un super visa qui ralentit</h2>
-<p>Les parents et grands-parents qui demandent le ${h.a('super-visa', 'super visa')} depuis le Cameroun vivent la tendance inverse. La ligne était à ${h.d(svLow.v)} le ${h.day(svLow.date)} et a monté à la plupart des relevés suivants, jusqu’à ${h.d(sv.last)}. La valeur médiane des pays est de ${h.d(median('super-visa'))}. Une famille qui veut un parent au Canada à une date précise peut demander plutôt un visa de visiteur ordinaire, plus rapide en ce moment, au prix de séjours plus courts.</p>
-${h.hist(ser('super-visa', C), { max: 8 })}
-<h2>Enfants et étudiants</h2>
-<p>Parrainer un enfant à charge qui vit au Cameroun prend ${h.t(tm('child', C))}, ${rankText('child', C, 'fr')} pays chiffrés ; la ligne indiquait ${h.d(ch.first!, 'm')} dans notre plus ancienne copie, datée du ${h.day(ch.firstDate!)}. Ce délai couvre tout le dossier de résidence permanente, de la réception à la décision. La ${h.a('dependent-child', 'page des enfants à charge')} le compare aux autres pays.</p>
-<p>Un permis d’études prend ${h.t(tm('study', C))}, ${rankText('study', C, 'fr')} pays, après ${h.d(st.first!, 'w')} le ${h.day(st.firstDate!)}. Les étudiants admis au Québec doivent aussi obtenir le CAQ avant la demande à IRCC.</p>
-<h2>Permis de travail</h2>
-<p>Un permis de travail demandé depuis le Cameroun prend ${h.t(tm('work', C))}, ${rankText('work', C, 'fr')} pays. Dans la copie du ${h.day(tr('work', C)!.firstDate!)}, la ligne indiquait ${h.d(tr('work', C)!.first!, 'w')} : elle aussi est bien plus courte qu’en 2024. La plupart des permis liés à un emploi exigent d’abord l’étude d’impact sur le marché du travail de l’employeur, et les aides familiaux, les travailleurs agricoles ou les travailleurs francophones embauchés hors du Québec ont chacun leur voie ; le délai publié ne commence qu’une fois la demande complète entre les mains d’IRCC.</p>
-<h2>Se servir de l’estimation</h2>
-<p>Choisissez la ligne et le mois où IRCC a reçu votre dossier. Le résultat ajoute le délai publié et dit si la date obtenue est encore devant vous. Comme les lignes du Cameroun ont beaucoup bougé, regardez aussi l’écart avec le relevé précédent : un délai qui a monté la semaine dernière peut continuer un moment, et la date obtenue aujourd’hui peut reculer.</p>
-<h2>La résidence décide de la ligne</h2>
-<p>Les Camerounais qui résident légalement dans un autre pays, comme le Nigeria, la Côte d’Ivoire ou la France, déposent en général depuis ce pays et relèvent de son chiffre. L’outil permet de passer d’un pays à l’autre pour voir l’écart avant de déposer.</p>
+<h2>Une grande source de nouveaux résidents permanents</h2>
+<p>Peu de pays envoient autant de demandes de résidence permanente à IRCC que le Cameroun. Les tableaux du traitement opérationnel comptent ${h.n(pr.last)} demandes reçues de citoyens camerounais sur les douze derniers mois, ${dirFr(pr.change)} de ${h.pa(pr.change)}, et ${h.n(co.last)} confirmations et visas de résidence permanente délivrés. Par année civile, les demandes reçues passent de ${h.n(prY('2023'))} en 2023 à ${h.n(prY(K.EE_FULL))} en ${K.EE_FULL}. Les Camerounais passent par Entrée express, par les programmes des candidats des provinces, par le Québec et par le parrainage familial, souvent pour un ${h.a('dependent-child', 'enfant à charge')} resté au Cameroun.</p>
+<p>Pour les dossiers familiaux, la norme d’IRCC pour un enfant à charge à l’étranger est de ${K.fmtStd(sChild.cur, 'fr')}, tenue pour ${h.pct(sChild.cur.perf)} des demandes à l’échelle du pays en ${K.fmtFy(sChild.fy, 'fr')}. La norme est nationale ; le délai de votre propre dossier se lit dans l’${h.src('ptimes', 'outil « Vérifier les délais de traitement »')} d’IRCC.</p>
+<h2>Entrée express et francophones</h2>
+<p>Les ${h.src('od-ee', 'données ouvertes sur les candidats invités')} montrent la vitesse de la progression : les invitations passent de ${h.n(ee0)} en 2023 à ${h.n(ee)} en ${K.EE_FULL}, et les ${nCur} premiers mois de ${K.EE_CUR} en comptent déjà ${h.n(eeCur)}. En ${K.EE_FULL}, le Cameroun se classe au ${ord(eeR, 'fr')} rang des pays de citoyenneté. Les rondes réservées aux francophones, aux seuils plus bas, récompensent le profil bilingue de nombreux diplômés camerounais ; ceux qui étudient ou travaillent déjà au Canada y ajoutent l’expérience canadienne.</p>
+${h.table(['Année', 'Camerounais invités', 'Rang par citoyenneté'], YRS.map((y) => [y === K.EE_CUR ? `${y} (${nCur} mois)` : y, h.n(K.eeCountry(y, C)), ord(eeRank(y, C), 'fr')]), 'Invitations Entrée express de citoyens camerounais. Source : IRCC, candidats invités d’Entrée express, données ouvertes ; chiffres arrondis à 5.', ['l', 'r', 'r'])}
+<p>Une fois invité, le candidat dépose sa demande de résidence permanente. IRCC vise une décision sur les dossiers ${h.a('express-entry', 'Entrée express')} en ${K.fmtStd(sCec.cur, 'fr')} ; saisissez le délai que montre son outil et la date de réception de votre dossier.</p>
+${h.mini('delai', { p: ['g', 'n', 'm'], d: { g: 'cec', c: C, m: 'none' }, t: 'Entrée express pour un candidat camerounais : date de décision estimée' })}
+<h2>Dossiers temporaires : études et visites</h2>
+<p>IRCC a finalisé ${h.n(tf.last)} demandes de résidence temporaire de citoyens camerounais en douze mois et en a approuvé ${h.pct(a.rate)}, une part ${dirFr(a.rate != null && a.prevRate != null ? a.rate - a.prevRate : null)} par rapport aux ${h.pct(a.prevRate)} d’avant. Les nouvelles demandes de permis d’études finalisées sont tombées à ${h.n(sp.last)}, ${dirFr(sp.change)} de ${h.pa(sp.change)}, après le plafond national des permis d’études. Les visas de visiteur approuvés atteignent ${h.n(v1.last)}. La part approuvée compte les retraits parmi les dossiers finalisés : lisez-la comme une tendance, pas comme un taux de refus.</p>
+${h.months(K.MONTHS, [['Demandes de RP reçues', K.full('prIn', C)], ['Autorisations de RP délivrées', K.full('copr', C)], ['Permis d’études finalisés', K.full('spFin', C)]], { caption: 'Citoyens camerounais, par mois. Source : IRCC, Traitement opérationnel, données ouvertes ; chiffres arrondis à 5.' })}
+<p>${h.n(ci.last)} personnes nées au Cameroun sont devenues citoyennes canadiennes sur les douze derniers mois. Les pages ${h.a('haiti', 'Haïti')} et ${h.a('algeria', 'Algérie')} présentent deux autres pays francophones aux profils différents.</p>
+<h2>Deux façons de compter un pays</h2>
+<p>L’outil des délais d’IRCC demande le pays depuis lequel vous déposez ; ses données ouvertes comptent des citoyens. Beaucoup de Camerounais demandent la résidence permanente depuis le Canada : ils lisent la ligne canadienne de l’outil tout en figurant ici sous le Cameroun.</p>
+<h2>Ce qui ralentit un dossier camerounais</h2>
+<p>Pour les demandeurs encore au Cameroun, la biométrie se fait au centre de réception des demandes de visa de Yaoundé, et le bureau d’IRCC qui traite le dossier peut se trouver à l’étranger. Les actes d’état civil sont un écueil fréquent : actes de naissance et de mariage doivent concorder dans toute la demande, et IRCC peut demander à les vérifier. Pour Entrée express, un certificat de police de chaque pays où vous avez vécu six mois ou plus est exigé avant le dépôt. Réunir ces pièces avant l’invitation évite de perdre une partie des soixante jours qu’IRCC accorde pour déposer.</p>
 `,
   },
 });

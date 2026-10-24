@@ -24,17 +24,15 @@ export function link(id: string, text: string, lang: Lang) {
 export const box = (title: string, html: string) => `<aside class="boxnote not-prose"><p class="boxnote-title">${title}</p><div class="text-navy-800">${html}</div></aside>`;
 export const mini = (kind: string, arg?: MiniOpts) => `<!--mini:${kind}${arg === undefined ? '' : `|${Buffer.from(JSON.stringify(arg)).toString('base64')}`}-->`;
 export const srcLink = (key: string, lang: Lang, text?: string) => { const s = SOURCES(lang)[key]; if (!s) throw new Error(`Unknown source ${key}`); return ext(s.url, text ?? s.label); };
-/** Relevés datés d'une série, du plus récent au plus ancien ; chaque ligne cite sa copie (lecture directe ou capture
- *  de la Wayback Machine, par sa date). Aucun point inventé : une date sans copie n'a pas de ligne. */
-export function histTable(series: string, lang: Lang, opts: { max?: number; unit?: string; caption?: string } = {}) {
-  const pts = KIT.points(series);
-  if (!pts.length) return '';
-  const u = opts.unit ?? 'd', fr = lang === 'fr';
-  const all = [...pts].reverse();
-  const shown = opts.max && all.length > opts.max ? [...all.slice(0, opts.max - 1), all[all.length - 1]] : all;
-  const rows = shown.map((p) => [KIT.day(p.date, lang), KIT.fmtDays(p.v, u, lang), p.via.startsWith('web.archive.org') ? ext(p.url, fr ? `copie archivée du ${KIT.day(`${p.via.slice(20, 24)}-${p.via.slice(24, 26)}-${p.via.slice(26, 28)}`, lang)}` : `archived copy of ${KIT.day(`${p.via.slice(20, 24)}-${p.via.slice(24, 26)}-${p.via.slice(26, 28)}`, lang)}`) : ext(p.url, fr ? `lu sur canada.ca le ${KIT.day(p.via.slice(7), lang)}` : `read on canada.ca on ${KIT.day(p.via.slice(7), lang)}`)]);
-  const cap = opts.caption ?? (fr ? `Délais relevés, du plus récent au plus ancien${shown.length < all.length ? ` (${shown.length} relevés sur ${all.length}, le plus ancien en dernier)` : ''}. Date = date de mise à jour publiée par IRCC.` : `Recorded times, newest first${shown.length < all.length ? ` (${shown.length} of ${all.length} readings, the oldest last)` : ''}. Date = update date published by IRCC.`);
-  return table([fr ? 'Date IRCC' : 'IRCC date', fr ? 'Délai publié' : 'Published time', fr ? 'Copie citée' : 'Copy cited'], rows, cap, ['l', 'r', 'l'], lang);
+/** Tableau mensuel de une ou plusieurs séries (données ouvertes d'IRCC), du mois le plus récent au plus ancien.
+ *  cols : [en-tête, série alignée sur `months`]. Un mois masqué par IRCC (1 à 4 personnes) s'affiche « masqué ». */
+export function monthTable(months: string[], cols: Array<[string, Array<number | null>]>, lang: Lang, opts: { max?: number; caption?: string } = {}) {
+  const fr = lang === 'fr', max = opts.max ?? 12;
+  const idx = months.map((_, i) => i).slice(-max).reverse();
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const rows = idx.map((i) => [cap(KIT.monthYear(`${months[i]}-15`, lang)), ...cols.map(([, v]) => (v[i] == null ? (fr ? 'masqué' : 'suppressed') : formatNumber(v[i] as number, 0, lang)))]);
+  const caption = opts.caption ?? (fr ? 'Par mois, du plus récent au plus ancien. Source : IRCC, données ouvertes, Licence du gouvernement ouvert – Canada ; chiffres arrondis à 5.' : 'By month, newest first. Source: IRCC open data, Open Government Licence – Canada; figures rounded to 5.');
+  return table([fr ? 'Mois' : 'Month', ...cols.map(([h]) => h)], rows, caption, ['l', ...cols.map(() => 'r' as const)], lang);
 }
 export function helpers(lang: Lang): Helpers {
   const f = KIT[lang];
@@ -42,8 +40,9 @@ export function helpers(lang: Lang): Helpers {
     ...KIT, lang, a: (id, text) => link(id, text, lang),
     table: (hd, rows, cap, al) => table(hd, rows, cap, al, lang),
     src: (key, text) => srcLink(key, lang, text), ext, box, mini,
-    n: f.n, day: f.day, my: f.my, t: f.t, d: f.d,
+    n: f.n, day: f.day, my: f.my,
+    pct: f.pct, ch: f.ch, pa: f.pa, w12: f.w12,
     cn: (code) => KIT.countryName(code, lang),
-    hist: (series, opts) => histTable(series, lang, opts),
+    months: (months, cols, opts) => monthTable(months, cols, lang, opts),
   };
 }

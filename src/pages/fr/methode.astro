@@ -1,5 +1,5 @@
 ---
-/** Méthode : les fichiers d'IRCC, les deux sortes de délai, l'estimation, l'archive, les limites. Chiffres : la trousse. */
+/** Méthode : les jeux de données ouverts lus, les deux sortes de délai d'IRCC, l'estimation, les normes de service, les volumes, les limites. Chiffres : la trousse. */
 import PageLayout from '../../layouts/PageLayout.astro';
 import { route } from '../../i18n/routes';
 import { KIT as K } from '../../lib/kit';
@@ -7,46 +7,43 @@ import { srcLink, table } from '../../lib/helpers';
 import { breadcrumbSchema, webPageSchema } from '../../lib/seo';
 const lang = 'fr';
 const path = route('method', lang);
-const F = K.fr, D = K.L.dates;
-const title = 'Méthode des délais IRCC 2026 : fichiers, estimation, archive';
-const description = 'Comment ce site lit les délais de traitement d’IRCC en 2026 : les quatre fichiers officiels, délais passés et prospectifs, date de décision estimée, archive.';
+const F = K.fr;
+const title = 'Méthode des délais IRCC 2026 : données ouvertes, estimation';
+const description = 'Comment fonctionne ce site en 2026 : les données ouvertes d’IRCC lues, les normes de service, la date estimée à partir du délai que vous copiez, et ses limites.';
 const s = (k: string, t: string) => srcLink(k, lang, t);
-const files = (['country', 'noncountry', 'flpt', 'tr'] as const).map((f) => [
-  { country: 'Délais par pays de dépôt', noncountry: 'Délais uniques (sans pays)', flpt: 'Résidence permanente et citoyenneté (prospectif)', tr: 'Prolongations de permis, par semaine (prospectif)' }[f],
-  F.day(D[f]), F.n(K.readingsCount(f)), F.day(K.firstReading(f)!), F.n(K.archivedCount(f)),
-]);
-const wp = K.readingOf('work-ext');
+const sets = [
+  [s('open-data', 'Traitement des demandes, mises à jour mensuelles d’IRCC'), 'Résidence temporaire reçue, finalisée et approuvée ; permis d’études finalisés ; visas de visiteur approuvés ; résidence permanente reçue ; confirmations de RP délivrées ; nouveaux citoyens', F.my(K.MONTHS[0]) + ' à ' + F.my(K.LAST.ops)],
+  [s('od-pr', 'Résidents permanents, mensuel'), 'Admissions par catégorie d’immigration', F.my(K.PRD.months[0]) + ' à ' + F.my(K.LAST.pr)],
+  [s('od-work', 'Titulaires de permis de travail, mensuel'), 'Permis du Programme de mobilité internationale par programme', F.my(K.IMPD.months[0]) + ' à ' + F.my(K.LAST.imp)],
+  [s('od-study', 'Titulaires de permis d’études, mensuel'), 'Permis d’études entrés en vigueur, par citoyenneté', F.my(K.STD.months[0]) + ' à ' + F.my(K.LAST.study)],
+  [s('od-ee', 'Candidats invités d’Entrée express'), 'Invitations par année, programme, tranche de score et citoyenneté', K.EE_YEARS[0] + ' à ' + K.EE_YEARS[K.EE_YEARS.length - 1]],
+  [s('od-std', 'Répertoire des services du gouvernement du Canada'), 'Normes de service d’IRCC et part des demandes qui les ont respectées', K.STD_YEARS.map((y) => K.fmtFy(y, lang)).join(', ')],
+];
+const vv = K.stdOf('visitor');
 ---
 <PageLayout title={title} description={description} lang={lang} jsonLd={[webPageSchema({ name: 'Méthode', description, path, lang }), breadcrumbSchema([{ name: 'Accueil', path: route('home', lang) }, { name: 'Méthode', path }])]} breadcrumbs={[{ label: 'Méthode' }]}>
   <article class="prose prose-slate max-w-none">
     <h1>Comment les chiffres sont construits</h1>
-    <p>Chaque délai de ce site vient des fichiers qui alimentent l’outil <Fragment set:html={s('ptimes', 'Vérifier les délais de traitement')} /> d’IRCC sur canada.ca. Un script les relit après chaque mise à jour ({F.day(K.READ)} pour cette édition), garde la date qu’IRCC inscrit dans chaque fichier et ajoute le relevé à une archive datée. Rien n’est signalé par des usagers, rien n’est copié d’un autre site, et rien de ce que vous saisissez dans un calculateur ne quitte votre navigateur.</p>
-    <h2>Les quatre fichiers</h2>
-    <ul>
-      <li><Fragment set:html={s('ptimes-country', 'Délais par pays')} /> : visa de visiteur, super visa, permis d’études, permis de travail et enfants à charge, un délai par pays de dépôt ; la ligne codée Canada couvre les demandes faites depuis le Canada.</li>
-      <li><Fragment set:html={s('ptimes-noncountry', 'Délais uniques')} /> : un seul délai pour tous, par exemple la fiche du visiteur, une prolongation de permis, l’AVE, la carte RP ou une recherche dans les registres de citoyenneté.</li>
-      <li><Fragment set:html={s('ptimes-flpt', 'Délais prospectifs')} /> : programmes de résidence permanente, parrainage familial, réfugiés et citoyenneté, avec le nombre de personnes en attente et une file par mois de dépôt.</li>
-      <li><Fragment set:html={s('ptimes-week', 'Files hebdomadaires')} /> : prolongations de permis d’études et de travail, avec une file par semaine de dépôt.</li>
-    </ul>
-    <Fragment set:html={table(['Fichier', 'Dernière mise à jour d’IRCC', 'Mises à jour gardées', 'La plus ancienne', 'Tirées de copies archivées'], files, `Notre archive de chaque fichier d’IRCC, au ${F.day(K.READ)}.`, ['l', 'l', 'r', 'l', 'r'], lang)} />
-    <p>Les rondes d’Entrée express viennent du <Fragment set:html={s('ee-data', 'fichier des rondes')} /> qui alimente la <Fragment set:html={s('ee-rounds', 'page des rondes d’invitations')} /> d’IRCC : date, catégorie, nombre d’invitations et score le plus bas invité.</p>
-    <h2>Délai passé et délai prospectif</h2>
-    <p>IRCC publie deux sortes de chiffres. Un <strong>délai passé</strong>, utilisé pour les visas, les permis et les documents, est le temps dans lequel IRCC a terminé 80 % des demandes tranchées récemment ; il décrit les dossiers des autres, et un sur cinq a pris plus longtemps. Un <strong>délai prospectif</strong>, utilisé pour la résidence permanente et la citoyenneté, est la projection d’IRCC pour une demande reçue aujourd’hui, selon son inventaire, son personnel et les demandes attendues. Les deux partent du jour où IRCC reçoit une demande complète et s’arrêtent à la décision (au serment pour la citoyenneté). Aucun ne compte le temps de la biométrie ni celui de répondre à une demande de documents.</p>
+    <p>Chaque chiffre de ce site vient de jeux de données que le gouvernement du Canada publie sur son portail de données ouvertes sous la <Fragment set:html={s('ogl', 'Licence du gouvernement ouvert du Canada')} />. Un script les relit ({F.day(K.READ)} pour cette édition ; le dernier mois du fichier mensuel d’IRCC est {F.my(K.LAST.ops)}) et écrit les valeurs qu’utilisent les pages. Rien n’est signalé par des usagers, rien n’est copié d’un autre site, et rien de ce que vous saisissez dans un calculateur ne quitte votre navigateur.</p>
+    <h2>Les jeux de données lus</h2>
+    <Fragment set:html={table(['Jeu de données', 'Ce qu’il donne', 'Période'], sets, `Données ouvertes relues le ${F.day(K.READ)}.`, ['l', 'l', 'l'], lang)} />
+    <p>Dans les fichiers mensuels, IRCC masque les valeurs de 1 à 4 et arrondit les autres au multiple de 5 le plus proche : les petits pays ont des trous et un total peut différer un peu de la somme de ses parties. Une demande « finalisée » ou « traitée » a reçu une décision définitive : approuvée, refusée ou retirée. La part d’approbation montrée ici rapporte donc les approbations à toutes les demandes finalisées ; ce n’est pas l’inverse d’un taux de refus.</p>
+    <h2>Les délais de traitement : pourquoi vous les copiez</h2>
+    <p>IRCC affiche ses délais du moment dans son outil <Fragment set:html={s('ptimes', 'Vérifier les délais de traitement')} /> sur canada.ca. Ces pages relèvent de l’<Fragment set:html={s('terms', 'avis du site canada.ca')} />, qui n’autorise pas la reproduction commerciale sans permission, et aucun jeu de données ouvert ne les publie. Ce site ne les reproduit donc pas : chaque calculateur vous demande le délai lu dans l’outil d’IRCC et fait le calcul de date à votre place. Quand IRCC a une norme de service pour le type de demande, le champ est prérempli avec cette norme, que vous pouvez remplacer.</p>
+    <p>IRCC emploie deux sortes de délai. Un <strong>délai passé</strong>, pour les visas, permis et documents, est le temps dans lequel IRCC a terminé la plupart des demandes décidées récemment. Un <strong>délai prospectif</strong>, pour la résidence permanente et la citoyenneté, est la projection d’IRCC pour une demande reçue aujourd’hui. Les deux partent du jour où IRCC reçoit une demande complète. Aucun n’inclut le temps de donner ses données biométriques ou de répondre à une demande de documents.</p>
     <h2>La date de décision estimée</h2>
-    <p>Estimation = date de réception de la demande complète par IRCC + délai publié, dans l’unité d’IRCC. Un délai en mois s’ajoute en mois de calendrier et s’affiche au mois près ; un délai en jours ou en semaines s’ajoute en jours et s’affiche au jour près. Sans date de dépôt, l’outil part de la date de lecture des fichiers, ce qui répond à « si je dépose maintenant ».</p>
-    <p>Pour les demandes qui ont une file, l’outil lit aussi la ligne d’IRCC de votre mois de dépôt (ou de votre semaine, comptée jours 1 à 7, 8 à 14 et ainsi de suite, comme dans le fichier hebdomadaire d’IRCC). Quand IRCC donne un temps restant, la décision attendue est la date de sa mise à jour plus ce temps ; quand IRCC écrit qu’il a besoin de plus de temps pour cette période, le résultat le dit au lieu de donner une date. Pour une prolongation de permis de travail, par exemple, IRCC compte {K.fmtAhead(wp.waiting ?? 0, 'fr')} demandes en attente à sa mise à jour du {F.day(wp.date)}.</p>
-    <h2>Tendances et archive</h2>
-    <p>Chaque relevé est gardé en nombre de jours, aligné sur les dates de mise à jour de son fichier. La tendance compare le dernier chiffre au précédent : un écart de moins de 5 % et de moins de deux jours est affiché comme inchangé. La plage donne la valeur la plus basse et la plus haute gardées, avec leurs dates.</p>
-    <p>Les mises à jour antérieures à notre première lecture directe viennent des copies des mêmes fichiers conservées par la <Fragment set:html={s('wayback', 'Wayback Machine')} /> de l’Internet Archive. Chaque copie est lue une fois, sa date IRCC est tirée du fichier lui-même, et la date de capture est citée à côté de chaque chiffre. Deux copies de la même mise à jour ne comptent qu’une fois. Une semaine sans copie n’a pas de point : l’archive n’est jamais interpolée, et aucun chiffre antérieur à la plus ancienne copie n’est affiché.</p>
+    <p>Estimation = date de réception de la demande complète + délai saisi, dans l’unité choisie. Un délai en mois s’ajoute en mois de calendrier ; un délai en jours ou en semaines s’ajoute en jours. Sans date de dépôt, l’outil prend la date du jour, ce qui répond à « si je dépose maintenant ». Le résultat montre aussi la part du délai déjà écoulée et si l’estimation est dépassée.</p>
+    <h2>Les normes de service</h2>
+    <p>Les normes de service sont les cibles d’IRCC, publiées avec leurs résultats dans le répertoire des services du gouvernement du Canada : par exemple un visa de visiteur demandé hors du Canada en {vv ? K.fmtStd(vv.cur, lang) : 'un délai publié'}, respecté pour {vv ? F.pct(vv.cur.perf) : 'une part'} des demandes en {vv ? K.fmtFy(vv.fy, lang) : 'dernier exercice'}. Une norme est une cible fixée par IRCC, pas le délai qu’il affiche aujourd’hui, et sa performance décrit un exercice passé.</p>
     <h2>Les pays</h2>
-    <p>Les noms de pays sont les noms usuels des codes de pays utilisés par IRCC, avec deux exceptions qu’IRCC fait lui-même : Gaza et la Cisjordanie sont listées à part. Le pays est celui d’où vous déposez, en général votre pays de résidence. Les lignes des pays qui déposent très peu de demandes varient d’une semaine à l’autre ; les tableaux du site mettent en tête les pays qui déposent le plus.</p>
-    <h2>La présence pour la citoyenneté</h2>
-    <p>Le calculateur de présence applique la règle de la <Fragment set:html={s('citizenship-act', 'Loi sur la citoyenneté, article 5')} />, telle qu’expliquée sur la <Fragment set:html={s('citizenship-eligibility', 'page d’admissibilité')} /> d’IRCC : {F.n(K.P.citizenship.required)} jours dans les cinq ans précédant la demande ; chaque jour comme résident temporaire ou personne protégée avant la résidence permanente compte pour une demi-journée, {F.n(K.P.citizenship.tempCap)} jours au plus. Il ne remplace pas le calculateur officiel d’IRCC, qui part des dates exactes de voyage.</p>
-    <h2>Licence et réutilisation</h2>
-    <p>Les chiffres sont des faits publiés par le gouvernement du Canada, cités avec leur source et leur date. Conformément aux <Fragment set:html={s('terms', 'avis de canada.ca')} />, ce site ne reproduit ni les pages, ni les tableaux, ni les mots-symboles d’IRCC, et il n’est ni affilié à IRCC ni approuvé par lui. D’autres statistiques d’IRCC sont publiées sous la Licence du gouvernement ouvert sur le <Fragment set:html={s('open-data', 'portail des données ouvertes')} />.</p>
+    <p>L’outil d’IRCC donne les délais selon le pays d’où vous déposez, en général votre pays de résidence. Les données ouvertes comptent les demandes par <strong>pays de citoyenneté</strong> (pays de naissance pour les nouveaux citoyens). Un citoyen indien qui vit aux Émirats arabes unis compte pour l’Inde dans les volumes, mais lit le délai des Émirats dans l’outil d’IRCC. Les noms de pays sont les noms usuels des codes de pays ; le Kosovo et l’Autorité palestinienne (Gaza et Cisjordanie) gardent l’intitulé d’IRCC, et quelques territoires sans code ne comptent que dans les totaux.</p>
+    <h2>La présence effective pour la citoyenneté</h2>
+    <p>Le calculateur de présence applique la règle de la <Fragment set:html={s('citizenship-act', 'Loi sur la citoyenneté, article 5')} /> telle qu’IRCC l’explique sur sa <Fragment set:html={s('citizenship-eligibility', 'page d’admissibilité')} /> : {F.n(K.CIT_RULE.required)} jours dans les cinq ans avant la demande ; chaque jour comme résident temporaire ou personne protégée avant la résidence permanente compte pour une demi-journée, {F.n(K.CIT_RULE.tempCap)} jours au plus. Il ne remplace pas le calculateur officiel d’IRCC, qui part des dates exactes de voyage.</p>
+    <h2>Licence et attribution</h2>
+    <p>Contient de l’information visée par la <Fragment set:html={s('ogl', 'Licence du gouvernement ouvert du Canada')} />. Ce site n’est ni affilié à IRCC ou au gouvernement du Canada ni approuvé par eux, et il n’utilise pas leurs mots-symboles.</p>
     <h2>Ce qui est laissé de côté</h2>
-    <p>Les dossiers individuels : le site ne voit jamais une demande. Les lignes qu’IRCC marque sans délai ou sans assez de données sont affichées ainsi, jamais complétées. Les frais, les conditions d’admissibilité autres que la présence pour la citoyenneté et les scores CRS sont hors du champ du site.</p>
+    <p>Les dossiers individuels : le site ne voit jamais une demande. Les délais du moment, les files d’attente et la liste ronde par ronde des invitations d’Entrée express sont sur les pages d’IRCC, vers lesquelles chaque page renvoie. Les frais, les règles d’admissibilité autres que la présence pour la citoyenneté et le calcul du score SCG sont hors du site.</p>
     <h2>Contrôles</h2>
-    <p>Des tests automatiques vérifient le calcul des dates en fin de mois, l’unité de chaque chiffre, la demi-journée et son plafond, la lecture des files marquées en retard, l’alignement de chaque série archivée et les catégories des rondes d’Entrée express. Si un fichier ne se lit pas, le précédent est gardé et les pages affichent la date IRCC réellement lue.</p>
+    <p>Des tests automatiques vérifient le calcul des dates en fin de mois, les sommes sur douze mois et leurs écarts, les tranches de score des invitations d’Entrée express, la demi-journée et son plafond, et la lecture des fichiers tableurs. Si un jeu de données ne peut pas être lu, les valeurs précédentes sont gardées et les pages montrent la date réellement lue.</p>
   </article>
 </PageLayout>

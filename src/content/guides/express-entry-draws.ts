@@ -1,117 +1,111 @@
 import { defineGuide, type Helpers } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
-import { CATS, type Cat, type Round } from '../../lib/engine/times';
 
-/* Rondes d'Entrée express (ee.json), toutes calculées au build : aucune valeur tapée à la main. */
-const R = K.ROUNDS;
-const since = `${Number(K.READ.slice(0, 4)) - 1}${K.READ.slice(4)}`;
-const last = R[0];
-const lastCat = K.catOf(last.name);
-const year = R.filter((r) => r.date >= since);
-const yearTotal = year.reduce((a, r) => a + r.size, 0);
-const scored = (l: Round[]) => l.filter((r) => typeof r.crs === 'number') as Array<Round & { crs: number }>;
-const st = (c: Cat) => K.eeStats(R, c, 0, since);
-const hi = (c: Cat) => Math.max(...scored(st(c).list).map((r) => r.crs));
-const present = CATS.filter((c) => st(c).n > 0).sort((a, b) => st(b).total - st(a).total);
-const years = [...new Set(R.map((r) => r.date.slice(0, 4)))].sort();
-const inYear = (y: string) => R.filter((r) => r.date.startsWith(y));
-const sumOf = (l: Round[]) => l.reduce((a, r) => a + r.size, 0);
-const oldest = R[R.length - 1];
-const cec = st('cec'), pnp = st('pnp'), fr = st('french');
-const lastGeneral = R.find((r) => K.catOf(r.name) === 'general');
-const fswOnly = R.filter((r) => K.catOf(r.name) === 'fsw').length;
-const biggest = year.reduce((a, r) => (r.size > a.size ? r : a), year[0]);
-const firstY = years[0], lastY = years[years.length - 1];
+/* Invitations d'Entrée express par année, programme et tranche de score CRS, d'après les données ouvertes
+ * « candidats invités » d'IRCC (OGL-Canada 2.0). La liste ronde par ronde (dates, tailles, scores minimaux)
+ * reste sur la page des rondes d'IRCC : elle n'est pas reproduite ici. */
 const E = K.en, F = K.fr;
+const full = K.EE_FULL, cur = K.EE_CUR, prevFull = String(Number(full) - 1);
+const order = K.EED.bandOrder;
+const at = (b: string) => { const i = order.indexOf(b); if (i < 0) throw new Error(`tranche absente : ${b}`); return i; };
+const sum = (v: number[], from: number, to = v.length) => v.slice(from, to).reduce((a, x) => a + x, 0);
+const share = (y: string, k: string, from: number, to?: number) => K.pctOf(sum(K.eeBands(y, k), from, to), K.eeYear(y, k));
+const i451 = at('451-500'), i501 = at('501-600'), i601 = at('601-700');
+/** Tranche qui a reçu le plus d'invitations. */
+const mode = (y: string, k: string) => { const v = K.eeBands(y, k); return order[v.indexOf(Math.max(...v))]; };
+/** Tranche la plus basse où le programme a reçu des invitations. */
+const lowest = (y: string, k: string) => order[K.eeBands(y, k).findIndex((x) => x > 0)];
+const hi = { full: share(full, 'all', i601), cur: share(cur, 'all', i601) };
+const below451 = { full: share(full, 'all', 0, i451), cur: share(cur, 'all', 0, i451) };
+const cecTop = share(full, 'cec', i501, i601), fswLow = share(full, 'fsw', 0, i501);
+const pnpLow = lowest(full, 'pnp');
+if (Number(pnpLow.split('-')[0]) < 601) throw new Error('express-entry-draws : des candidats des provinces invités sous 601 points, revoir le texte');
+const s480 = K.eeBandShare(full, 'all', 480);
+const chFull = K.pctOf(K.eeYear(full) - K.eeYear(prevFull), K.eeYear(prevFull));
+const top = K.eeTop(full, 3);
+const years = K.EE_YEARS.slice(-4);
+const bl = (b: string, l: 'en' | 'fr') => b.replace('-', l === 'fr' ? ' à ' : ' to ');
 
-function catRows(h: Helpers) {
-  return present.map((c) => {
-    const s = st(c);
-    return [K.catName(c, h.lang), s.n, s.total, s.lowest ? `${s.lowest.crs} (${h.day(s.lowest.date)})` : '', String(hi(c)), s.last ? h.day(s.last.date) : ''];
-  });
+function bandRows(h: Helpers) {
+  const cols: Array<[string, string]> = [[full, 'all'], [cur, 'all'], [full, 'cec'], [full, 'fsw'], [full, 'pnp']];
+  return order.map((b, i) => [bl(b, h.lang), ...cols.map(([y, k]) => K.eeBands(y, k)[i])] as const)
+    .filter((r) => r.slice(1).some((x) => (x as number) > 0)).reverse().map((r) => [r[0], ...r.slice(1).map((x) => h.n(x as number))]);
 }
 function yearRows(h: Helpers) {
-  return years.map((y) => { const l = inYear(y); const sc = scored(l).map((r) => r.crs); return [y, l.length, sumOf(l), sc.length ? `${Math.min(...sc)} · ${Math.max(...sc)}` : '']; });
-}
-function lastRows(h: Helpers) {
-  return R.slice(0, 10).map((r) => [h.day(r.date), String(r.n), K.catName(K.catOf(r.name), h.lang), r.size, typeof r.crs === 'number' ? String(r.crs) : '']);
+  return years.map((y) => [y === cur ? (h.lang === 'fr' ? `${y} (en cours)` : `${y} (to date)`) : y, h.n(K.eeYear(y)), h.pct(share(y, 'all', 0, i451)), h.pct(share(y, 'all', i451, i601)), h.pct(share(y, 'all', i601)), bl(mode(y, 'all'), h.lang)]);
 }
 
 export default defineGuide({
   id: 'express-entry-draws', group: 'tools', order: 70,
   tool: 'entree', toolArg: { crs: 480, k: 'all' },
   related: ['express-entry', 'cec', 'fsw', 'pnp', 'history', 'method'],
-  sources: ['ee-rounds', 'ee-data', 'express-entry'],
+  sources: ['od-ee', 'ee-rounds', 'express-entry', 'ogl'],
   en: {
     slug: 'express-entry-draws',
-    nav: 'Express Entry draws', card: 'Every round since 2024, cut-offs by category',
-    title: 'Express Entry Draws: Cut-offs and Invitations by Round 2026',
-    description: 'Express Entry draws in 2026: latest round, lowest and highest cut-off by category over 12 months, invitations per year since 2024, from IRCC’s rounds file.',
-    h1: 'Express Entry draws, round by round',
-    intro: `The latest round in IRCC’s file is number ${last.n}, held on ${E.day(last.date)}: ${E.n(last.size)} invitations, ${K.catName(lastCat, 'en')}.`,
-    resume: `Our reading of IRCC’s rounds file keeps ${E.n(R.length)} Express Entry draws, from ${E.day(oldest.date)} to ${E.day(last.date)}. The most recent one, round ${last.n}, was a ${K.catName(lastCat, 'en')} round on ${E.day(last.date)} with ${E.n(last.size)} invitations to apply${typeof last.crs === 'number' ? ` and a minimum score of ${last.crs}` : ''}. In the twelve months since ${E.day(since)}, IRCC held ${E.n(year.length)} rounds and sent ${E.n(yearTotal)} invitations. Canadian Experience Class rounds needed between ${cec.lowest?.crs} and ${hi('cec')} points, provincial nominee rounds between ${pnp.lowest?.crs} and ${hi('pnp')} because a nomination adds 600 points, and French-language rounds between ${fr.lowest?.crs} and ${hi('french')}. These are past results: IRCC picks the category, the size and therefore the cut-off of each round, and the next one can land well above or below the last. This site does not compute your CRS score; enter the score shown in your profile in the tool above to see how many recent rounds it would have met.`,
+    nav: 'Express Entry draws', card: 'Invitations by year, program and CRS score band, and where your score falls',
+    title: 'Express Entry Invitations by CRS Score Band in 2026',
+    description: 'Express Entry invitations in 2026 by year, program and CRS score band, from IRCC open data: see what share of invited candidates scored below or above yours.',
+    h1: 'Express Entry invitations by year, program and score band',
+    intro: `In ${full}, IRCC invited ${E.n(K.eeYear(full))} Express Entry candidates; the band that received the most invitations was ${bl(mode(full, 'all'), 'en')} points.`,
+    resume: `IRCC publishes as open data the number of Express Entry candidates it invited each year, broken down by the program under which they were invited and by CRS score band. In ${full}, the last full year, it invited ${E.n(K.eeYear(full))} candidates, ${chFull != null && chFull < 0 ? `${E.pa(chFull)} fewer than` : `${E.pa(chFull)} more than`} in ${prevFull}: ${E.n(K.eeYear(full, 'cec'))} under the Canadian Experience Class, ${E.n(K.eeYear(full, 'fsw'))} under the Federal Skilled Worker Program and ${E.n(K.eeYear(full, 'pnp'))} provincial nominees. ${E.pct(below451.full)} of those invitations went to scores under 451 and ${E.pct(hi.full)} to scores above 600, almost all of them nominees whose nomination added points. For a score of 480, ${E.pct(s480.below)} of the ${full} invitations went to lower bands and ${E.pct(s480.above)} to higher ones. So far in ${cur}, IRCC has invited ${E.n(K.eeYear(cur))} candidates. Enter your own score above to place it.`,
     faqs: [
-      { q: 'What was the cut-off in the latest Express Entry draw?', a: `Round ${last.n}, on ${E.day(last.date)}, invited ${E.n(last.size)} candidates in the ${K.catName(lastCat, 'en')} category${typeof last.crs === 'number' ? `, with a lowest invited score of ${last.crs}` : ''}. A cut-off only applies to its own category: a score that misses a Canadian Experience Class round can still be enough for a French-language or trades round, and the reverse.` },
-      { q: 'Why are provincial nominee draw scores above 700?', a: `A provincial nomination obtained through Express Entry adds 600 points to the profile. Over the last twelve months, nominee rounds had cut-offs from ${pnp.lowest?.crs} to ${hi('pnp')}, which means the candidates invited held between roughly ${pnp.lowest!.crs! - 600} and ${hi('pnp') - 600} points before the nomination. The figure is not comparable with other categories.` },
-      { q: 'Can past Express Entry rounds tell me when I will be invited?', a: 'No. IRCC decides before each round which category to draw, how many invitations to send and when. The pool also changes every day as profiles enter, expire or improve. Past rounds show the range of scores that were invited recently; they are a description of what happened, not a schedule or a forecast.' },
-      { q: 'How many Express Entry invitations were issued in 2025?', a: `IRCC’s file lists ${E.n(inYear('2025').length)} rounds in 2025 with ${E.n(sumOf(inYear('2025')))} invitations in total, against ${E.n(sumOf(inYear('2024')))} in ${E.n(inYear('2024').length)} rounds in 2024. In ${lastY} so far, up to ${E.day(last.date)}, there were ${E.n(inYear(lastY).length)} rounds and ${E.n(sumOf(inYear(lastY)))} invitations. Each invitation is one candidate, not one family.` },
+      { q: 'What does the share below my CRS band actually tell me?', a: 'It tells you how many of the year’s invitations went to candidates who scored less than you, across all rounds. A high share means many rounds reached below your score, often through category-based draws. It is not a probability of being invited: each round has its own cut-off, category and size, set by IRCC on the day.' },
+      { q: 'Why do Express Entry scores above 600 belong almost only to provincial nominees?', a: `A provincial nomination obtained through an Express Entry stream adds 600 points to the CRS score, which lifts a nominee far above other candidates. In IRCC’s ${full} data, provincial nominee invitations start in the ${bl(pnpLow, 'en')} band, while Canadian Experience Class and Federal Skilled Worker invitations sit almost entirely below 601.` },
+      { q: 'Where can I find the date and cut-off score of each Express Entry round?', a: 'On IRCC’s rounds of invitations page, which lists every round with its date, category, number of invitations and minimum score. This site does not copy that list. It works from IRCC’s yearly open data on invited candidates, which counts invitations by program, score band and citizenship.' },
+      { q: 'Are the Express Entry invitation counts exact?', a: `No. IRCC rounds each figure in its open data on invited candidates to the nearest 5, so small bands can show 0 or 5 when a handful of people were invited. Totals by year and program are therefore close but not exact. The ${cur} figures cover only the months IRCC has published so far.` },
     ],
     body: (h) => `
-<h2>The latest rounds</h2>
-<p>The table below shows the ten most recent rounds as IRCC published them, newest first. Each round has a number, a date, a category, a size and the score of the lowest-ranked candidate who was invited. When several candidates tie at that score, IRCC uses the date and time each profile was submitted to break the tie, which is why two rounds with the same cut-off can reach a different number of people.</p>
-${h.table(['Date', 'Round', 'Category', 'Invitations', 'Cut-off'], lastRows(h), `Latest ten Express Entry rounds, IRCC rounds file read on ${h.day(K.EE_READ)}.`, ['l', 'l', 'l', 'r', 'r'])}
-<p>Rounds now come in short bursts. A typical fortnight has a provincial nominee round, a Canadian Experience Class round and one category round, often on consecutive days. The largest single round of the last twelve months was round ${biggest.n} on ${h.day(biggest.date)}, with ${h.n(biggest.size)} invitations in the ${K.catName(K.catOf(biggest.name), h.lang)} category.</p>
-<h2>Cut-offs over twelve months, by category</h2>
-<p>Comparing scores across categories mixes very different pools. A French-language round draws from candidates with strong French test results, whatever their occupation; a healthcare round only considers people with recent experience in a listed occupation. The lowest score in one category says nothing about the cut-off of another.</p>
-${h.table(['Category', 'Rounds', 'Invitations', 'Lowest cut-off', 'Highest cut-off', 'Latest round'], catRows(h), `Rounds held between ${h.day(since)} and ${h.day(last.date)}, by category.`, ['l', 'r', 'r', 'r', 'r', 'r'])}
-<p>Canadian Experience Class rounds have been the most regular route for candidates with a year of skilled work in Canada: ${h.n(cec.n)} rounds and ${h.n(cec.total)} invitations in twelve months. Category rounds for physicians or senior managers are small, sometimes a few hundred invitations, and their low cut-offs reflect a narrow pool rather than an easy door. ${lastGeneral ? `The last round open to every program was on ${h.day(lastGeneral.date)}.` : 'No round open to every program appears in the period.'} ${fswOnly ? `The file lists ${h.n(fswOnly)} rounds limited to Federal Skilled Worker candidates.` : 'No round in the file was limited to Federal Skilled Worker candidates, who are invited through general or category rounds.'}</p>
-${h.mini('entree', { p: ['crs', 'k'], d: { crs: 500, k: 'cec' }, t: 'Your score against twelve months of rounds' })}
-<h2>Reading a cut-off correctly</h2>
-<p>A cut-off is the score of the last person invited, not a pass mark set in advance. If IRCC sends fewer invitations, the cut-off rises; if it sends more, it falls, even when the pool has not changed. A drop of ten points from one round to the next can come from a larger round alone. That is why the tool above counts how many recent rounds your score would have met in a category instead of quoting one threshold: the share of rounds tells more than the last number.</p>
-<h2>Invitations year by year</h2>
-${h.table(['Year', 'Rounds', 'Invitations', 'Lowest · highest cut-off'], yearRows(h), `All rounds in the file, ${firstY} to ${lastY} (${lastY} up to ${h.day(last.date)}).`, ['l', 'r', 'r', 'r'])}
-<p>The yearly totals rise from ${h.n(sumOf(inYear(firstY)))} invitations in ${firstY} to ${h.n(sumOf(inYear('2025')))} in 2025, and ${lastY} has already reached ${h.n(sumOf(inYear(lastY)))}. The spread between the lowest and highest cut-off each year is mostly the effect of the 600 nomination points and of small category rounds, not of a general rise or fall in the scores needed.</p>
+<h2>What this page measures</h2>
+<p>Each Express Entry round invites candidates above a minimum Comprehensive Ranking System score, sometimes among all candidates, sometimes within a category such as French speakers or a group of occupations. IRCC lists each round on its ${h.src('ee-rounds', 'rounds of invitations page')}. Separately, it publishes as ${h.src('od-ee', 'open data')} the number of candidates invited over a whole year, by program and by score band. That yearly view is what this page uses: it does not tell you the cut-off of the next round, but it shows where invitations actually went once every round of the year is added up.</p>
+${h.mini('entree', { p: ['crs', 'k'], d: { crs: 480, k: 'all' }, t: 'Your CRS score against last year’s invitations' })}
+<h2>Invitations by score band</h2>
+<p>The table gives the count of invited candidates in each band for ${full} and for ${cur} so far, then for ${full} by program. Bands with no invitation in any column are left out.</p>
+${h.table(['CRS band', `All, ${full}`, `All, ${cur}`, `CEC, ${full}`, `FSW, ${full}`, `Nominees, ${full}`], bandRows(h), 'Express Entry candidates invited, by CRS score band. Source: IRCC, Express Entry invited candidates, open data; figures rounded to 5.', ['l', 'r', 'r', 'r', 'r', 'r'])}
+<p>In ${full}, the Canadian Experience Class drew ${h.pct(cecTop)} of its invitations from the ${bl('501-600', 'en')} band, while ${h.pct(fswLow)} of Federal Skilled Worker invitations went to scores under 501. That gap follows from how the rounds were run: candidates with Canadian work experience tend to score higher, and category rounds can reach further down the ranking for a targeted group. Provincial nominees start at ${bl(pnpLow, 'en')}, the effect of the points a nomination adds.</p>
+<h2>Year by year</h2>
+<p>The same data over four years shows how the spread of scores moves as IRCC changes the size and type of its rounds.</p>
+${h.table(['Year', 'Invitations', 'Under 451', '451 to 600', 'Above 600', 'Busiest band'], yearRows(h), 'Express Entry invitations by year and score range. Source: IRCC open data; shares computed by this site.', ['l', 'r', 'r', 'r', 'r', 'l'])}
+<p>The share of invitations under 451 went ${below451.cur != null && below451.full != null && below451.cur > below451.full ? 'up' : 'down'} from ${h.pct(below451.full)} in ${full} to ${h.pct(below451.cur)} in ${cur} so far, and the share above 600 went ${hi.cur != null && hi.full != null && hi.cur > hi.full ? 'up' : 'down'} from ${h.pct(hi.full)} to ${h.pct(hi.cur)}. A partial year can still shift as later rounds are added, so read ${cur} as a trend in progress. A rising share at the low end usually means more category rounds, which invite a targeted group at a lower cut-off than general rounds.</p>
+<h2>Reading your score against these counts</h2>
+<p>The calculator places your score in its band and adds up the invitations below, inside and above it for the year and program you choose. If most invitations of a year went to bands under yours, your score was competitive that year for that program; if most went above, you would have needed a category round or more points. Points can still move: a language test retaken, a further year of skilled work, a spouse’s credentials or a job offer can each shift your band. The score that counts is the one on the day of a round, not the one you entered when you joined.</p>
+<h2>Who was invited</h2>
+<p>By citizenship, the three largest groups invited in ${full} were citizens of ${h.cn(top[0][0])}, ${h.cn(top[1][0])} and ${h.cn(top[2][0])}, with ${h.n(top[0][1])}, ${h.n(top[1][1])} and ${h.n(top[2][1])} invitations. These counts cover principal applicants only: spouses and children are added later, when the permanent residence application is filed.</p>
 <h2>After the invitation</h2>
-<p>An invitation opens a 60-day window to submit a complete application for permanent residence. From that point the processing time is the one IRCC publishes for the program you were invited under, which is a forward-looking figure: see the ${h.a('cec', 'Canadian Experience Class')}, ${h.a('fsw', 'Federal Skilled Worker')} and ${h.a('pnp', 'provincial nominee')} pages, or the ${h.a('express-entry', 'Express Entry overview')} that puts the three side by side.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'cec', m: 'none' }, t: 'After an invitation: estimated decision' })}
-<h2>What this page does not do</h2>
-<p>It does not compute a Comprehensive Ranking System score and does not guess the next cut-off. The numbers come from the rounds file IRCC publishes on ${h.src('ee-rounds', 'its Express Entry rounds page')}, read on ${h.day(K.EE_READ)}; the program rules are on ${h.src('express-entry', 'IRCC’s Express Entry pages')}. Radif Partners publishes this site independently of IRCC, and the ${h.a('method', 'method page')} explains how each file is read.</p>
+<p>An invitation gives you a fixed window to submit a complete application; the processing time starts only once IRCC receives it. For that stage, the ${h.a('express-entry', 'Express Entry processing time')} page sets out IRCC’s service standard and turns the time shown on IRCC’s ${h.src('ptimes', 'Check processing times tool')} into a date. The ${h.a('cec', 'Canadian Experience Class')}, ${h.a('fsw', 'Federal Skilled Worker')} and ${h.a('pnp', 'provincial nominee')} pages give the detail by program.</p>
 `,
   },
   fr: {
     slug: 'rondes-entree-express',
-    nav: 'Rondes d’Entrée express', card: 'Chaque ronde depuis 2024, scores par catégorie',
-    title: 'Rondes d’Entrée express : scores minimaux, invitations 2026',
-    description: 'Rondes d’Entrée express en 2026 : dernière ronde, score minimal le plus bas et le plus haut par catégorie sur 12 mois, invitations par année depuis 2024.',
-    h1: 'Rondes d’Entrée express, une par une',
-    intro: `La dernière ronde du fichier d’IRCC porte le numéro ${last.n}, le ${F.day(last.date)} : ${F.n(last.size)} invitations, catégorie ${K.catName(lastCat, 'fr')}.`,
-    resume: `Notre lecture du fichier des rondes d’IRCC garde ${F.n(R.length)} rondes d’Entrée express, du ${F.day(oldest.date)} au ${F.day(last.date)}. La plus récente, la ronde ${last.n} du ${F.day(last.date)}, visait la catégorie ${K.catName(lastCat, 'fr')} et a envoyé ${F.n(last.size)} invitations à présenter une demande${typeof last.crs === 'number' ? `, avec un score minimal de ${last.crs}` : ''}. Sur les douze mois écoulés depuis le ${F.day(since)}, IRCC a tenu ${F.n(year.length)} rondes et envoyé ${F.n(yearTotal)} invitations. Les rondes de l’expérience canadienne ont demandé de ${cec.lowest?.crs} à ${hi('cec')} points, celles des candidats des provinces de ${pnp.lowest?.crs} à ${hi('pnp')}, parce qu’une désignation ajoute 600 points, et celles du français de ${fr.lowest?.crs} à ${hi('french')}. Ce sont des résultats passés : IRCC choisit la catégorie et la taille de chaque ronde, donc son score minimal, et la suivante peut tomber bien plus haut ou plus bas. Ce site ne calcule pas votre score CRS ; indiquez celui de votre profil dans l’outil ci-dessus pour voir combien de rondes récentes il aurait passées.`,
+    nav: 'Rondes d’Entrée express', card: 'Invitations par année, programme et tranche de score SCG, et la place de votre score',
+    title: 'Rondes d’Entrée express par tranche de score en 2026',
+    description: 'Rondes d’Entrée express en 2026 : invitations par année, programme et tranche de score SCG selon les données ouvertes d’IRCC, et la part allée sous votre score.',
+    h1: 'Invitations de l’Entrée express par année, programme et tranche de score',
+    intro: `En ${full}, IRCC a invité ${F.n(K.eeYear(full))} candidats de l’Entrée express ; la tranche qui a reçu le plus d’invitations est celle de ${bl(mode(full, 'all'), 'fr')} points.`,
+    resume: `IRCC publie en données ouvertes le nombre de candidats de l’Entrée express invités chaque année, ventilé par programme d’invitation et par tranche de score du Système de classement global. En ${full}, dernière année complète, il a invité ${F.n(K.eeYear(full))} candidats, ${chFull != null && chFull < 0 ? `soit ${F.pa(chFull)} de moins` : `soit ${F.pa(chFull)} de plus`} qu’en ${prevFull} : ${F.n(K.eeYear(full, 'cec'))} au titre de l’expérience canadienne, ${F.n(K.eeYear(full, 'fsw'))} pour les travailleurs qualifiés du fédéral et ${F.n(K.eeYear(full, 'pnp'))} candidats des provinces. ${F.pct(below451.full)} de ces invitations sont allées à des scores inférieurs à 451 et ${F.pct(hi.full)} à des scores au-dessus de 600, presque tous des candidats désignés par une province. Pour un score de 480, ${F.pct(s480.below)} des invitations de ${full} sont allées à des tranches plus basses et ${F.pct(s480.above)} à des tranches plus hautes. Depuis le début de ${cur}, IRCC a invité ${F.n(K.eeYear(cur))} candidats. Saisissez votre score ci-dessus pour le situer.`,
     faqs: [
-      { q: 'Quel score fallait-il à la dernière ronde d’Entrée express ?', a: `La ronde ${last.n}, le ${F.day(last.date)}, a invité ${F.n(last.size)} candidats de la catégorie ${K.catName(lastCat, 'fr')}${typeof last.crs === 'number' ? `, avec un score minimal de ${last.crs}` : ''}. Un score minimal ne vaut que pour sa catégorie : un score trop bas pour une ronde de l’expérience canadienne peut suffire pour une ronde du français ou des métiers, et l’inverse.` },
-      { q: 'Pourquoi les rondes des candidats des provinces dépassent-elles 700 points ?', a: `Une désignation provinciale obtenue par Entrée express ajoute 600 points au profil. Sur douze mois, ces rondes ont eu des scores minimaux de ${pnp.lowest?.crs} à ${hi('pnp')} : les candidats invités avaient donc environ ${pnp.lowest!.crs! - 600} à ${hi('pnp') - 600} points avant la désignation. Ce chiffre ne se compare pas aux autres catégories.` },
-      { q: 'Les rondes passées disent-elles quand je serai invité ?', a: 'Non. Avant chaque ronde, IRCC décide de la catégorie, du nombre d’invitations et de la date. Le bassin change aussi chaque jour, avec les profils qui entrent, expirent ou s’améliorent. Les rondes passées montrent la fourchette des scores invités récemment : elles décrivent ce qui s’est passé, ce n’est ni un calendrier ni une prévision.' },
-      { q: 'Combien d’invitations d’Entrée express ont été envoyées en 2025 ?', a: `Le fichier d’IRCC compte ${F.n(inYear('2025').length)} rondes en 2025 et ${F.n(sumOf(inYear('2025')))} invitations au total, contre ${F.n(sumOf(inYear('2024')))} en ${F.n(inYear('2024').length)} rondes en 2024. En ${lastY}, jusqu’au ${F.day(last.date)}, on compte ${F.n(inYear(lastY).length)} rondes et ${F.n(sumOf(inYear(lastY)))} invitations. Chaque invitation vise un candidat, pas une famille.` },
+      { q: 'Que m’apprend la part des invitations sous ma tranche de score SCG ?', a: 'Elle indique combien d’invitations de l’année sont allées à des candidats moins bien classés que vous, toutes rondes confondues. Une part élevée signifie que beaucoup de rondes sont descendues sous votre score, souvent par des rondes ciblées. Ce n’est pas une probabilité d’invitation : chaque ronde a son propre seuil, sa catégorie et sa taille, fixés par IRCC le jour même.' },
+      { q: 'Pourquoi les scores au-dessus de 600 sont-ils presque tous des candidats des provinces ?', a: `Une désignation provinciale obtenue par un volet Entrée express ajoute 600 points au score SCG, ce qui place le candidat désigné très au-dessus des autres. Dans les données d’IRCC pour ${full}, les invitations de candidats des provinces commencent à la tranche ${bl(pnpLow, 'fr')}, alors que celles de l’expérience canadienne et des travailleurs qualifiés restent presque toutes sous 601.` },
+      { q: 'Où trouver la date et le score minimal de chaque ronde d’Entrée express ?', a: 'Sur la page des rondes d’invitations d’IRCC, qui donne chaque ronde avec sa date, sa catégorie, son nombre d’invitations et son score minimal. Ce site ne recopie pas cette liste. Il s’appuie sur les données ouvertes annuelles d’IRCC sur les candidats invités, comptés par programme, tranche de score et citoyenneté.' },
+      { q: 'Les nombres d’invitations de l’Entrée express sont-ils exacts ?', a: `Non. IRCC arrondit chaque chiffre de ses données ouvertes sur les candidats invités à 5 près : une petite tranche peut afficher 0 ou 5 quand quelques personnes seulement ont été invitées. Les totaux par année et par programme sont donc proches, sans être exacts. Les chiffres de ${cur} ne couvrent que les mois déjà publiés.` },
     ],
     body: (h) => `
-<h2>Les dernières rondes</h2>
-<p>Le tableau reprend les dix rondes les plus récentes telles qu’IRCC les publie, de la plus récente à la plus ancienne. Chaque ronde a un numéro, une date, une catégorie, un nombre d’invitations et le score du dernier candidat invité. Quand plusieurs candidats sont à égalité à ce score, IRCC les départage par la date et l’heure de création du profil ; deux rondes au même score minimal peuvent donc toucher un nombre différent de personnes.</p>
-${h.table(['Date', 'Ronde', 'Catégorie', 'Invitations', 'Score minimal'], lastRows(h), `Dix dernières rondes d’Entrée express, fichier d’IRCC lu le ${h.day(K.EE_READ)}.`, ['l', 'l', 'l', 'r', 'r'])}
-<p>Les rondes arrivent maintenant par petites séries. Une quinzaine type compte une ronde des candidats des provinces, une ronde de l’expérience canadienne et une ronde par catégorie, souvent sur des jours qui se suivent. La plus grosse ronde des douze derniers mois est la ronde ${biggest.n} du ${h.day(biggest.date)}, avec ${h.n(biggest.size)} invitations dans la catégorie ${K.catName(K.catOf(biggest.name), h.lang)}.</p>
-<h2>Scores minimaux sur douze mois, par catégorie</h2>
-<p>Comparer les scores d’une catégorie à l’autre mélange des bassins très différents. Une ronde du français puise parmi les candidats qui ont de très bons résultats au test de français, quel que soit leur métier ; une ronde de la santé ne regarde que les personnes qui ont une expérience récente dans une profession de la liste. Le score le plus bas d’une catégorie ne dit rien de celui d’une autre.</p>
-${h.table(['Catégorie', 'Rondes', 'Invitations', 'Score le plus bas', 'Score le plus haut', 'Dernière ronde'], catRows(h), `Rondes tenues du ${h.day(since)} au ${h.day(last.date)}, par catégorie.`, ['l', 'r', 'r', 'r', 'r', 'r'])}
-<p>Les rondes de l’expérience canadienne restent la voie la plus régulière pour les candidats qui ont un an de travail qualifié au Canada : ${h.n(cec.n)} rondes et ${h.n(cec.total)} invitations en douze mois. Les rondes réservées aux médecins ou aux cadres supérieurs sont petites, parfois quelques centaines d’invitations, et leur score bas tient à un bassin étroit plutôt qu’à une porte facile. ${lastGeneral ? `La dernière ronde ouverte à tous les programmes date du ${h.day(lastGeneral.date)}.` : 'Aucune ronde ouverte à tous les programmes ne figure sur la période.'} ${fswOnly ? `Le fichier compte ${h.n(fswOnly)} rondes réservées aux travailleurs qualifiés du fédéral.` : 'Aucune ronde du fichier n’était réservée aux travailleurs qualifiés du fédéral, invités par les rondes générales ou par catégorie.'}</p>
-${h.mini('entree', { p: ['crs', 'k'], d: { crs: 500, k: 'french' }, t: 'Votre score face à douze mois de rondes' })}
-<h2>Bien lire un score minimal</h2>
-<p>Le score minimal est celui du dernier candidat invité, pas une note de passage fixée à l’avance. Si IRCC envoie moins d’invitations, il monte ; s’il en envoie plus, il baisse, même quand le bassin n’a pas changé. Une baisse de dix points d’une ronde à l’autre peut venir de la seule taille de la ronde. C’est pourquoi l’outil ci-dessus compte combien de rondes récentes votre score aurait passées dans une catégorie plutôt que de citer un seuil unique : la part des rondes en dit plus que le dernier chiffre.</p>
-<h2>Les invitations année par année</h2>
-${h.table(['Année', 'Rondes', 'Invitations', 'Score le plus bas · le plus haut'], yearRows(h), `Toutes les rondes du fichier, de ${firstY} à ${lastY} (${lastY} jusqu’au ${h.day(last.date)}).`, ['l', 'r', 'r', 'r'])}
-<p>Le total annuel passe de ${h.n(sumOf(inYear(firstY)))} invitations en ${firstY} à ${h.n(sumOf(inYear('2025')))} en 2025, et ${lastY} en compte déjà ${h.n(sumOf(inYear(lastY)))}. L’écart entre le score le plus bas et le plus haut de chaque année vient surtout des 600 points de la désignation provinciale et des petites rondes par catégorie, pas d’une hausse ou d’une baisse générale du score demandé.</p>
+<h2>Ce que mesure cette page</h2>
+<p>Chaque ronde de l’Entrée express invite les candidats au-dessus d’un score minimal du Système de classement global, parfois parmi tous les candidats, parfois dans une catégorie comme les francophones ou un groupe de professions. IRCC publie chaque ronde sur sa ${h.src('ee-rounds', 'page des rondes d’invitations')}. À part, il diffuse en ${h.src('od-ee', 'données ouvertes')} le nombre de candidats invités sur une année entière, par programme et par tranche de score. C’est cette vue annuelle que la page utilise : elle ne donne pas le seuil de la prochaine ronde, mais elle montre où sont réellement allées les invitations une fois toutes les rondes de l’année additionnées.</p>
+${h.mini('entree', { p: ['crs', 'k'], d: { crs: 480, k: 'all' }, t: 'Votre score SCG face aux invitations de l’an dernier' })}
+<h2>Les invitations par tranche de score</h2>
+<p>Le tableau donne le nombre de candidats invités dans chaque tranche pour ${full} et pour ${cur} jusqu’ici, puis pour ${full} par programme. Les tranches sans aucune invitation sont omises.</p>
+${h.table(['Tranche SCG', `Tous, ${full}`, `Tous, ${cur}`, `Exp. canadienne, ${full}`, `TQF, ${full}`, `Provinces, ${full}`], bandRows(h), 'Candidats de l’Entrée express invités, par tranche de score SCG. Source : IRCC, Entrée express, candidats invités, données ouvertes ; chiffres arrondis à 5.', ['l', 'r', 'r', 'r', 'r', 'r'])}
+<p>En ${full}, l’expérience canadienne a tiré ${h.pct(cecTop)} de ses invitations de la tranche ${bl('501-600', 'fr')}, tandis que ${h.pct(fswLow)} des invitations des travailleurs qualifiés du fédéral sont allées à des scores inférieurs à 501. L’écart tient à la façon dont les rondes ont été menées : les candidats qui ont une expérience de travail au Canada obtiennent en général plus de points, et les rondes ciblées peuvent descendre plus bas dans le classement pour un groupe donné. Les candidats des provinces commencent à ${bl(pnpLow, 'fr')}, effet des points qu’apporte la désignation.</p>
+<h2>Année par année</h2>
+<p>Les mêmes données sur quatre ans montrent comment la répartition des scores bouge quand IRCC change la taille et le type de ses rondes.</p>
+${h.table(['Année', 'Invitations', 'Sous 451', '451 à 600', 'Au-dessus de 600', 'Tranche la plus fournie'], yearRows(h), 'Invitations de l’Entrée express par année et par plage de score. Source : données ouvertes d’IRCC ; parts calculées par ce site.', ['l', 'r', 'r', 'r', 'r', 'l'])}
+<p>La part des invitations sous 451 est ${below451.cur != null && below451.full != null && below451.cur > below451.full ? 'montée' : 'descendue'} de ${h.pct(below451.full)} en ${full} à ${h.pct(below451.cur)} en ${cur} jusqu’ici, et la part au-dessus de 600 est ${hi.cur != null && hi.full != null && hi.cur > hi.full ? 'montée' : 'descendue'} de ${h.pct(hi.full)} à ${h.pct(hi.cur)}. Une année partielle peut encore bouger avec les rondes suivantes : lisez ${cur} comme une tendance en cours.</p>
+<h2>Lire votre score face à ces nombres</h2>
+<p>Le calculateur place votre score dans sa tranche et additionne les invitations allées sous elle, dans elle et au-dessus, pour l’année et le programme choisis. Si la plupart des invitations d’une année sont allées à des tranches inférieures à la vôtre, votre score était compétitif cette année-là pour ce programme ; si elles sont allées au-dessus, il aurait fallu une ronde ciblée ou davantage de points. Les points peuvent encore bouger : un test de langue repassé, une année de plus de travail qualifié, les diplômes d’un époux ou une offre d’emploi peuvent chacun changer votre tranche. Le score qui compte est celui du jour de la ronde, pas celui saisi à l’entrée dans le bassin.</p>
+<h2>Qui a été invité</h2>
+<p>Par citoyenneté, les trois groupes les plus nombreux invités en ${full} viennent, dans cet ordre, des pays suivants : ${h.cn(top[0][0])}, ${h.cn(top[1][0])} et ${h.cn(top[2][0])}, avec ${h.n(top[0][1])}, ${h.n(top[1][1])} et ${h.n(top[2][1])} invitations. Ces nombres ne comptent que les demandeurs principaux : époux et enfants s’ajoutent plus tard, au dépôt de la demande de résidence permanente.</p>
 <h2>Après l’invitation</h2>
-<p>Une invitation ouvre une fenêtre de 60 jours pour envoyer une demande complète de résidence permanente. À partir de là, le délai qui compte est celui qu’IRCC publie pour le programme de l’invitation, un délai prospectif : voir les pages de la ${h.a('cec', 'catégorie de l’expérience canadienne')}, des ${h.a('fsw', 'travailleurs qualifiés du fédéral')} et des ${h.a('pnp', 'candidats des provinces')}, ou la ${h.a('express-entry', 'vue d’ensemble d’Entrée express')} qui compare les trois.</p>
-${h.mini('delai', { p: ['g', 'm'], d: { g: 'cec', m: 'none' }, t: 'Après l’invitation : décision estimée' })}
-<h2>Ce que cette page ne fait pas</h2>
-<p>Elle ne calcule pas de score du Système de classement global et ne devine pas le prochain score minimal. Les chiffres viennent du fichier des rondes qu’IRCC publie sur ${h.src('ee-rounds', 'sa page des rondes d’invitations')}, lu le ${h.day(K.EE_READ)} ; les règles du programme sont sur ${h.src('express-entry', 'les pages Entrée express d’IRCC')}. Radif Partners publie ce site sans lien avec IRCC, et la ${h.a('method', 'page de méthode')} explique comment chaque fichier est lu.</p>
+<p>Une invitation ouvre un délai fixe pour envoyer une demande complète ; le délai de traitement ne commence qu’à sa réception par IRCC. Pour cette étape, la page du ${h.a('express-entry', 'délai de l’Entrée express')} présente la norme de service d’IRCC et transforme le délai affiché par l’${h.src('ptimes', 'outil « Vérifier les délais de traitement »')} en une date. Les pages ${h.a('cec', 'expérience canadienne')}, ${h.a('fsw', 'travailleurs qualifiés du fédéral')} et ${h.a('pnp', 'candidats des provinces')} détaillent chaque programme.</p>
 `,
   },
 });

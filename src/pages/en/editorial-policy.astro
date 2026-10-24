@@ -4,18 +4,18 @@ import { route } from '../../i18n/routes';
 import { AUTHOR_NAME } from '../../data/site-config';
 const lang = 'en';
 ---
-<PageLayout title="Editorial Policy of Canada Processing Times 2026: Sources" description="How Canada Processing Times writes its 2026 pages: IRCC’s published files only, every figure read by a script and dated, estimates labelled with their method, no consultant money." lang={lang} noindex={true} breadcrumbs={[{ label: 'Editorial policy' }]} showAuthor={false}>
+<PageLayout title="Editorial Policy of Canada Processing Times 2026: Sources" description="How Canada Processing Times writes its 2026 pages: Canadian open data only, figures read by a script and dated, estimates labelled, no consultant money." lang={lang} noindex={true} breadcrumbs={[{ label: 'Editorial policy' }]} showAuthor={false}>
   <div class="prose prose-slate max-w-none">
     <h1>Editorial policy</h1>
     <h2>What counts as a source</h2>
-    <p>IRCC’s published files and pages on canada.ca, the Citizenship Act on the Justice Laws website, and copies of IRCC’s files kept by the Internet Archive, cited with their capture date. A news article, a forum post or another site can point us to a change; we publish it only after reading IRCC’s own figure. Times reported by applicants are not used.</p>
+    <p>Data sets published on the Government of Canada open data portal under the Open Government Licence of Canada, IRCC’s program pages on canada.ca for the rules (linked, not reproduced), and the Citizenship Act on the Justice Laws website. A news article, a forum post or another site can point us to a change; we publish it only after reading the official figure. Times reported by applicants are not used, and IRCC’s current processing times are not copied: readers enter the time they read on IRCC’s tool.</p>
     <h2>How a figure reaches a page</h2>
-    <p>A script reads each IRCC file, keeps the update date IRCC wrote in it and the date it was read, and adds the reading to the archive. Pages and calculators read those files; nobody types a time into a page. When a file cannot be read, the previous one is kept and pages show the IRCC date actually read.</p>
+    <p>A script reads each open data file, keeps the date of the data and the date it was read, and writes the values used by the pages. Pages and calculators read those values; nobody types a figure into a page. When a file cannot be read, the previous values are kept and the pages show the date actually read.</p>
     <h2>Estimates</h2>
-    <p>A decision date is always called an estimate, with its method linked. Nothing in the archive is interpolated: a week with no copy of IRCC’s file has no figure.</p>
+    <p>A decision date is always called an estimate, with its method linked. Months that IRCC hides in its files stay empty: nothing is filled in or interpolated.</p>
     <h2>Independence</h2>
-    <p>{AUTHOR_NAME} receives nothing from consultants, law firms, schools, recruiters or any other business that serves applicants, and the pages carry no affiliate links. The site is not linked to IRCC or any public body and does not present itself as one.</p>
+    <p>{AUTHOR_NAME} receives nothing from consultants, law firms, schools, recruiters or any other business that serves applicants, and the pages carry no affiliate links. The site is not affiliated with or endorsed by IRCC or any public body and does not present itself as one.</p>
     <h2>Corrections</h2>
-    <p>A reported error is checked against IRCC’s file; if we were wrong, the page is corrected the same day. Write through the <a href={route('contact', lang)}>contact page</a>.</p>
+    <p>A reported error is checked against the official data; if we were wrong, the page is corrected the same day. Write through the <a href={route('contact', lang)}>contact page</a>.</p>
   </div>
 </PageLayout>

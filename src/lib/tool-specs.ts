@@ -1,16 +1,21 @@
 /**
- * Les simulateurs du site, dans les deux langues. Chaque chiffre vient des fichiers IRCC relus (src/lib/data.ts)
- * et du moteur pur src/lib/engine/times.ts. Une spec liste ses champs (visibles d'abord, `adv` repliés) et une
- * fonction `run` qui rend la carte de résultat. « Aujourd'hui » = date de lecture des fichiers (READ).
+ * Les simulateurs du site, dans les deux langues. Les chiffres de contexte viennent des données ouvertes d'IRCC
+ * (src/lib/data.ts, Licence du gouvernement ouvert – Canada) ; le délai de traitement, lui, est saisi par le lecteur
+ * tel qu'il l'a lu dans l'outil d'IRCC : le site ne reproduit pas les délais publiés sur canada.ca.
+ * Une spec liste ses champs (visibles d'abord, `adv` repliés) et une fonction `run` qui rend la carte de résultat.
+ * « Aujourd'hui » = date de lecture des fichiers (READ) : même résultat au build et dans le navigateur.
  */
 import type { ToolSpec, V, Opt, ToolOut } from './tool-types';
 import { resolve } from './tool-types';
 import type { Lang } from './format';
 import {
-  PROGS, byName, progById, readingOf, altOf, countriesOf, countryName, MAJOR, READ, ROUNDS, EE_READ, CIT_RULE, L,
-  fmtTime, fmtDays, fmtDelta, fmtAhead, day, monthYear, whenAt, num, recentTrend, recentPoints, estimate, isTime, daysOf, type Family,
+  PROGS, byName, progById, countryName, COUNTRIES, MAJOR, READ, O, LAST, CIT_RULE, EE_YEARS, EE_PROG, EED,
+  opsSeries, ops12, approval12, net12, rank12, prSeries, pr12, prName, impSeries, imp12, impName, PRD, IMPD,
+  fmtN, fmtPct, fmtChange, fmtTime, num, day, monthYear, whenAt, window12, eeYear, eeBands, eeBandShare, eeCountry,
+  stdOf, fmtStd, fmtFy,
+  type Family, type Metric,
 } from './data';
-import { addDays, addTime, citizenship, catOf, eeStats, CATS, dateOf, type Cat } from './engine/times';
+import { addDays, addTime, citizenship, dateOf, estimate, type Unit } from './engine/times';
 
 export type Args = Record<string, number | string>;
 const T = (l: Lang, fr: string, en: string) => (l === 'fr' ? fr : en);
@@ -22,11 +27,8 @@ const FAM: Record<Family, { en: string; fr: string }> = {
   pr: { en: 'Permanent residence', fr: 'Résidence permanente' }, family: { en: 'Family and refugees', fr: 'Famille et réfugiés' }, cit: { en: 'Citizenship and PR card', fr: 'Citoyenneté et carte RP' },
 };
 const progOpts = (l: Lang, only?: string[]): Opt[] => PROGS.filter((g) => !only || only.includes(g.id)).map((g) => ({ value: g.id, label: `${FAM[g.family][l]} · ${g.name[l]}` }));
-const countryOpts = (g: string, l: Lang): Opt[] => {
-  const cs = countriesOf(g);
-  if (!cs.length) return [{ value: '-', label: T(l, 'Sans objet pour cette demande', 'Not used for this application') }];
-  return cs.map((c) => ({ value: c, label: countryName(c, l) })).sort((a, b) => byName(a.label, b.label));
-};
+const countryOpts = (l: Lang): Opt[] => COUNTRIES.map((c) => ({ value: c, label: countryName(c, l) })).sort((a, b) => byName(a.label, b.label));
+const unitOpts = (l: Lang): Opt[] => [{ value: 'd', label: T(l, 'jours', 'days') }, { value: 'w', label: T(l, 'semaines', 'weeks') }, { value: 'm', label: T(l, 'mois', 'months') }];
 /** Mois de dépôt proposés : « pas encore » puis les 36 derniers mois. */
 const monthOpts = (l: Lang): Opt[] => {
   const out: Opt[] = [{ value: 'none', label: T(l, 'Pas encore déposée', 'Not applied yet') }];
@@ -34,100 +36,96 @@ const monthOpts = (l: Lang): Opt[] => {
   for (let i = 0; i < 36; i++) { const d = new Date(Date.UTC(y, m - 1 - i, 15)); const ym = d.toISOString().slice(0, 7); const lab = monthYear(`${ym}-15`, l); out.push({ value: ym, label: lab.charAt(0).toUpperCase() + lab.slice(1) }); }
   return out;
 };
-const unitOf = (t: unknown) => (t && typeof t === 'object' && 'u' in (t as object) ? (t as { u: string }).u : 'd');
+/** Exemple de délai pré-rempli selon l'unité habituelle : un exemple à remplacer, pas un délai publié. */
+const EXAMPLE: Record<Unit, number> = { d: 60, w: 12, m: 12 };
+const label = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
 
-/** Tableau comparatif des grands pays de dépôt pour un programme par pays. */
-function compareTable(g: string, c: string, l: Lang): ToolOut['table'] {
-  const prog = progById(g);
-  const codes = [...new Set([c, ...MAJOR])].filter((x) => countriesOf(g).includes(x));
-  const rows = codes.map((x) => {
-    const r = readingOf(g, x), tr = recentTrend(r.series), d = daysOf(r.t);
-    return { x, d: d ?? Infinity, row: [x === c ? `<strong>${countryName(x, l)}</strong>` : countryName(x, l), fmtTime(r.t, l), tr?.prev != null ? fmtDays(tr.prev, unitOf(r.t), l) : '', tr?.delta != null ? fmtDelta(tr.delta, unitOf(r.t), l) : ''] };
-  }).sort((a, b) => a.d - b.d);
-  const tr0 = recentTrend(readingOf(g, c).series);
-  return {
-    caption: T(l, `${prog.name.fr} : délai publié par pays de dépôt, relevé du ${day(L.dates.country, l)}, comparé au relevé précédent${tr0?.prevDate ? ` (${day(tr0.prevDate, l)})` : ''}.`, `${prog.name.en}: published time by country of filing, ${day(L.dates.country, l)} reading, against the previous reading${tr0?.prevDate ? ` (${day(tr0.prevDate, l)})` : ''}.`),
-    headers: [T(l, 'Pays', 'Country'), T(l, 'Délai publié', 'Published time'), T(l, 'Relevé précédent', 'Previous reading'), T(l, 'Écart', 'Change')],
-    rows: rows.map((r) => r.row), align: ['l', 'r', 'r', 'r'],
-  };
+/** Tableau des 12 derniers mois d'une série mensuelle. */
+function monthTable(caption: string, head: string, months: string[], v: Array<number | null>, l: Lang): ToolOut['table'] {
+  const k = Math.max(0, months.length - 12);
+  return { caption, headers: [T(l, 'Mois', 'Month'), head], rows: months.slice(k).map((m, i) => [label(monthYear(`${m}-15`, l)), fmtN(v[k + i] ?? null, l)]).reverse(), align: ['l', 'r'] };
 }
-/** File d'attente publiée par IRCC (mois ou semaine de dépôt). */
-function queueTable(g: string, mine: string | undefined, l: Lang): ToolOut['table'] | undefined {
-  const prog = progById(g), r = readingOf(g);
-  const q = r.queue ?? []; if (!q.length) return undefined;
-  const weekly = prog.src === 'tr';
-  const tail = q.slice(-12);
-  const rows = (mine && !tail.some((x) => x[0] === mine) ? [...q.filter((x) => x[0] === mine), ...tail] : tail);
-  const label = (k: string) => (weekly ? T(l, `${monthYear(`${k.slice(0, 7)}-15`, l)}, semaine ${Number(k.slice(8))}`, `${monthYear(`${k.slice(0, 7)}-15`, l)}, week ${Number(k.slice(8))}`) : monthYear(`${k}-15`, l));
-  const left = (x: unknown) => (x === 'late' ? T(l, 'délai prévu dépassé', 'past the expected time') : typeof x === 'number' ? `${num(x, l)} ${weekly ? T(l, x === 1 ? 'semaine' : 'semaines', x === 1 ? 'week' : 'weeks') : T(l, 'mois', x === 1 ? 'month' : 'months')}` : String(x ?? '').startsWith('gt') ? T(l, 'plus de 10 ans', 'more than 10 years') : '');
-  return {
-    caption: T(l, `File publiée par IRCC le ${day(r.date, l)} : temps restant et personnes devant, selon ${weekly ? 'la semaine' : 'le mois'} de dépôt.`, `Queue published by IRCC on ${day(r.date, l)}: time left and people ahead, by ${weekly ? 'week' : 'month'} of filing.`),
-    headers: [T(l, weekly ? 'Semaine de dépôt' : 'Mois de dépôt', weekly ? 'Week filed' : 'Month filed'), T(l, 'Temps restant', 'Time left'), T(l, 'Personnes devant', 'People ahead')],
-    rows: rows.map((x) => [x[0] === mine ? `<strong>${label(x[0])}</strong>` : label(x[0]), left(x[1]), fmtAhead(x[2], l)]), align: ['l', 'r', 'r'],
-  };
-}
-/** Relevés datés de notre historique (extrait récent). */
-function historyTable(series: string, u: string, l: Lang, max = 10): ToolOut['table'] | undefined {
-  const pts = recentPoints(series); if (pts.length < 2) return undefined;
-  const rows = pts.slice(-max).reverse().map(([d, v], i, a) => [day(d, l), fmtDays(v, u, l), i < a.length - 1 ? fmtDelta(v - a[i + 1][1], u, l) : '']);
-  return {
-    caption: T(l, `Nos relevés datés de ce délai (les ${Math.min(max, pts.length)} derniers), tels qu’IRCC les publiait.`, `Our dated readings of this time (latest ${Math.min(max, pts.length)}), as IRCC published them.`),
-    headers: [T(l, 'Date publiée par IRCC', 'Date published by IRCC'), T(l, 'Délai', 'Time'), T(l, 'Écart', 'Change')], rows, align: ['l', 'r', 'r'],
-  };
+/** Contexte tiré des données ouvertes pour un type de demande (et un pays de citoyenneté). */
+function context(g: string, c: string, l: Lang): { rows: ToolOut['rows']; table?: ToolOut['table'] } {
+  const prog = progById(g), k = prog.ctx, w = window12(O.months, l);
+  const rows: ToolOut['rows'] = [];
+  if (k.kind === 'tr' || k.kind === 'visit' || k.kind === 'study') {
+    const a = approval12(c), nt = net12(c);
+    rows.push([T(l, `Demandes de résidence temporaire finalisées, ${countryName(c, 'fr')} (${w})`, `Temporary residence applications finalized, ${countryName(c, 'en')} (${w})`), fmtN(a.fin, l)]);
+    rows.push([T(l, 'Part approuvée sur ces douze mois', 'Share approved over these twelve months'), fmtPct(a.rate, l)]);
+    if (a.prevRate != null) rows.push([T(l, 'Part approuvée, douze mois d’avant', 'Share approved, previous twelve months'), fmtPct(a.prevRate, l)]);
+    if (nt.net != null) rows.push([T(l, 'Reçues moins finalisées (douze mois)', 'Received minus finalized (twelve months)'), `${nt.net > 0 ? '+' : ''}${num(nt.net, l)}`]);
+    const m: Metric = k.kind === 'visit' ? 'v1' : k.kind === 'study' ? 'spFin' : 'trFin';
+    if (m !== 'trFin') { const y = ops12(m, c); rows.push([T(l, `${m === 'v1' ? 'Visas de visiteur approuvés' : 'Demandes de permis d’études finalisées'}, ${countryName(c, 'fr')}`, `${m === 'v1' ? 'Visitor visas approved' : 'Study permit applications finalized'}, ${countryName(c, 'en')}`), `${fmtN(y.last, l)} (${fmtChange(y.change, l)})`]); }
+    return { rows, table: monthTable(T(l, `${m === 'v1' ? 'Visas de visiteur (V-1) approuvés' : m === 'spFin' ? 'Nouvelles demandes de permis d’études finalisées' : 'Demandes de résidence temporaire finalisées'}, citoyens de ${countryName(c, 'fr')}, par mois. Source : IRCC, données ouvertes (OGL-Canada 2.0).`, `${m === 'v1' ? 'Visitor visas (V-1) approved' : m === 'spFin' ? 'New study permit applications finalized' : 'Temporary residence applications finalized'}, citizens of ${countryName(c, 'en')}, by month. Source: IRCC open data (OGL-Canada 2.0).`), T(l, 'Personnes', 'People'), O.months, opsSeries(m, c), l) };
+  }
+  if (k.kind === 'pr') {
+    const y = pr12(k.key!);
+    rows.push([T(l, `Admissions de résidents permanents : ${prName(k.key!, 'fr')} (${window12(PRD.months, 'fr')})`, `Permanent resident admissions: ${prName(k.key!, 'en')} (${window12(PRD.months, 'en')})`), fmtN(y.last, l)]);
+    rows.push([T(l, 'Écart avec les douze mois d’avant', 'Change from the previous twelve months'), fmtChange(y.change, l)]);
+    return { rows, table: monthTable(T(l, `Admissions de résidents permanents par mois, ${prName(k.key!, 'fr')}. Source : IRCC, données ouvertes (OGL-Canada 2.0).`, `Permanent resident admissions by month, ${prName(k.key!, 'en')}. Source: IRCC open data (OGL-Canada 2.0).`), T(l, 'Admissions', 'Admissions'), PRD.months, prSeries(k.key!), l) };
+  }
+  if (k.kind === 'imp') {
+    const y = imp12(k.key!);
+    rows.push([T(l, `Permis entrés en vigueur : ${impName(k.key!, 'fr')} (${window12(IMPD.months, 'fr')})`, `Permits that took effect: ${impName(k.key!, 'en')} (${window12(IMPD.months, 'en')})`), fmtN(y.last, l)]);
+    rows.push([T(l, 'Écart avec les douze mois d’avant', 'Change from the previous twelve months'), fmtChange(y.change, l)]);
+    return { rows, table: monthTable(T(l, `Permis entrés en vigueur par mois, ${impName(k.key!, 'fr')}. Source : IRCC, données ouvertes (OGL-Canada 2.0).`, `Permits that took effect by month, ${impName(k.key!, 'en')}. Source: IRCC open data (OGL-Canada 2.0).`), T(l, 'Permis', 'Permits'), IMPD.months, impSeries(k.key!), l) };
+  }
+  if (k.kind === 'cit') {
+    const y = ops12('cit');
+    rows.push([T(l, `Nouveaux citoyens canadiens (${w})`, `New Canadian citizens (${w})`), fmtN(y.last, l)]);
+    rows.push([T(l, 'Écart avec les douze mois d’avant', 'Change from the previous twelve months'), fmtChange(y.change, l)]);
+    return { rows, table: monthTable(T(l, 'Nouveaux citoyens canadiens par mois. Source : IRCC, données ouvertes (OGL-Canada 2.0).', 'New Canadian citizens by month. Source: IRCC open data (OGL-Canada 2.0).'), T(l, 'Personnes', 'People'), O.months, opsSeries('cit'), l) };
+  }
+  return { rows };
 }
 
 function delai(l: Lang, arg?: Args): ToolSpec {
   const only = arg?.only ? String(arg.only).split(',') : undefined;
+  const g0 = progById(String(arg?.g ?? 'visitor'));
+  // Pré-réglage : la norme de service publiée par IRCC pour ce type de demande (données ouvertes), sinon un exemple.
+  const s0 = stdOf(g0.id)?.cur, preset = s0?.n && (s0.u === 'd' || s0.u === 'm') ? { n: s0.n, u: s0.u as Unit } : { n: EXAMPLE[g0.unit], u: g0.unit };
   return {
     inputs: [
-      { kind: 'select', id: 'g', label: T(l, 'Type de demande', 'Application type'), def: String(arg?.g ?? 'visitor'), options: progOpts(l, only), wide: true },
-      { kind: 'select', id: 'c', label: T(l, 'Pays où vous déposez', 'Country you apply from'), def: String(arg?.c ?? 'IN'), options: (v: V) => countryOpts(s(v, 'g'), l), help: T(l, 'Pays de résidence pour un visa ou un permis demandé hors du Canada', 'Country of residence for a visa or permit requested from outside Canada'), wide: true },
+      { kind: 'select', id: 'g', label: T(l, 'Type de demande', 'Application type'), def: g0.id, options: progOpts(l, only), wide: true },
+      { id: 'n', label: T(l, 'Délai affiché par IRCC', 'Time shown by IRCC'), def: Number(arg?.n ?? preset.n), max: 999, wide: true, help: T(l, 'Recopiez le délai que l’outil « Vérifier les délais de traitement » d’IRCC affiche pour votre demande (pré-rempli : norme de service d’IRCC ou exemple)', 'Copy the time IRCC’s “Check processing times” tool shows for your application (filled in: IRCC’s service standard or an example)') },
+      { kind: 'select', id: 'u', label: T(l, 'Unité', 'Unit'), def: String(arg?.u ?? preset.u), options: unitOpts(l) },
       { kind: 'select', id: 'm', label: T(l, 'Mois de votre demande', 'Month you applied'), def: String(arg?.m ?? 'none'), options: monthOpts(l) },
       { id: 'd', label: T(l, 'Jour de la demande', 'Day you applied'), def: Number(arg?.d ?? 15), max: 31, help: T(l, 'Jour où IRCC a reçu la demande complète', 'Day IRCC received your complete application') },
+      { kind: 'select', id: 'c', label: T(l, 'Pays de citoyenneté (contexte)', 'Country of citizenship (context)'), def: String(arg?.c ?? 'IN'), options: countryOpts(l), help: T(l, 'Sert seulement aux volumes publiés par IRCC pour vos concitoyens', 'Only used for the volumes IRCC publishes for your fellow citizens'), adv: true, wide: true },
     ],
     run: (v) => {
-      const g = s(v, 'g'), prog = progById(g), c = s(v, 'c') === '-' ? 'IN' : s(v, 'c');
-      const r = readingOf(g, c), t = isTime(r.t) ? r.t : null, u = unitOf(r.t);
+      const g = s(v, 'g'), prog = progById(g), c = s(v, 'c') || 'IN';
+      const u = (['d', 'w', 'm'].includes(s(v, 'u')) ? s(v, 'u') : prog.unit) as Unit;
+      const t = { n: Math.max(0, Math.round(n(v, 'n'))), u };
       const applied = s(v, 'm') === 'none' ? null : dateOf(s(v, 'm'), n(v, 'd'));
-      const e = estimate(g, c, applied);
-      const tr = recentTrend(r.series);
-      const where = prog.src === 'country' && !prog.fixed ? T(l, ` depuis ${countryName(c, l)}`, ` from ${countryName(c, l)}`) : '';
-      const rows: ToolOut['rows'] = [[T(l, `Délai publié par IRCC (${day(r.date, l)})`, `Time published by IRCC (${day(r.date, l)})`), fmtTime(r.t, l)]];
-      let value = fmtTime(r.t, l), label = T(l, `Délai publié${where}`, `Published processing time${where}`);
+      const rows: ToolOut['rows'] = [[T(l, 'Délai saisi', 'Time entered'), fmtTime(t.n, u, l)]];
+      let value: string, lab: string;
       if (applied) {
+        const e = estimate(applied, t, READ);
         rows.push([T(l, 'Demande reçue le', 'Application received on'), day(applied, l)]);
-        rows.push([T(l, `Temps écoulé au ${day(READ, l)}`, `Time elapsed as of ${day(READ, l)}`), `${num(e.elapsed ?? 0, l)} ${T(l, 'jours', 'days')}`]);
-        if (e.date && t) {
-          rows.push([T(l, 'Date de dépôt + délai publié', 'Filing date + published time'), whenAt(e.date, t, l)]);
-          const rem = e.remaining ?? 0;
-          rows.push(rem >= 0 ? [T(l, 'Reste, si le délai se maintient', 'Left, if the time holds'), `${num(rem, l)} ${T(l, 'jours', 'days')}`] : [T(l, 'Au-delà du délai publié de', 'Beyond the published time by'), `${num(-rem, l)} ${T(l, 'jours', 'days')}`]);
-          label = T(l, `Décision estimée${where}`, `Estimated decision${where}`); value = rem < 0 ? T(l, 'délai dépassé', 'past the published time') : whenAt(e.date, t, l);
-        }
-        if (e.queue) {
-          const q = e.queue, unitW = q.unit === 'w';
-          if (q.left === 'late') { rows.push([T(l, 'File d’IRCC pour votre période de dépôt', 'IRCC queue for your filing period'), T(l, 'délai prévu dépassé', 'past the expected time')]); value = T(l, 'délai dépassé', 'past the expected time'); label = T(l, 'Selon la file publiée par IRCC', 'According to the queue IRCC publishes'); }
-          else if (typeof q.left === 'number' && q.date) {
-            rows.push([T(l, 'File d’IRCC : temps restant', 'IRCC queue: time left'), `${num(q.left, l)} ${unitW ? T(l, 'semaines', 'weeks') : T(l, 'mois', 'months')}`]);
-            if (q.ahead != null) rows.push([T(l, 'Personnes devant vous', 'People ahead of you'), fmtAhead(q.ahead, l)]);
-            value = unitW ? day(q.date, l) : monthYear(q.date, l); label = T(l, `Décision attendue selon la file d’IRCC`, `Decision expected from IRCC’s queue`);
-          }
-        }
-      } else if (t) {
-        rows.push([T(l, `Demande déposée le ${day(READ, l)} : décision vers`, `Applying on ${day(READ, l)}: decision around`), whenAt(addTime(READ, t), t, l)]);
+        rows.push([T(l, `Temps écoulé au ${day(READ, l)}`, `Time elapsed as of ${day(READ, l)}`), `${num(e.elapsed, l)} ${T(l, 'jours', 'days')}`]);
+        rows.push([T(l, 'Part du délai déjà écoulée', 'Share of the time already elapsed'), fmtPct(e.share, l)]);
+        rows.push(e.overdue ? [T(l, 'Au-delà du délai saisi de', 'Beyond the time entered by'), `${num(-e.remaining, l)} ${T(l, 'jours', 'days')}`] : [T(l, 'Reste, si le délai se maintient', 'Left, if the time holds'), `${num(e.remaining, l)} ${T(l, 'jours', 'days')}`]);
+        lab = T(l, 'Décision estimée', 'Estimated decision'); value = e.overdue ? T(l, 'délai dépassé', 'past the time entered') : whenAt(e.date, u, l);
+      } else {
+        const d = addTime(READ, t);
+        rows.push([T(l, `Demande déposée le ${day(READ, l)} : décision vers`, `Applying on ${day(READ, l)}: decision around`), whenAt(d, u, l)]);
+        lab = T(l, 'Décision vers, si vous déposez aujourd’hui', 'Decision around, if you apply today'); value = whenAt(d, u, l);
       }
-      if (r.waiting) rows.push([T(l, 'Demandes en attente dans cette file', 'Applications waiting in this line'), fmtAhead(r.waiting, l)]);
-      const alt = altOf(g);
-      if (alt) rows.push([T(l, `Délai passé (80 % traitées), ${day(alt.date, l)}`, `Past time (80% processed), ${day(alt.date, l)}`), fmtTime(alt.t, l)]);
-      if (tr?.delta != null && tr.prevDate) rows.push([T(l, `Écart avec le relevé du ${day(tr.prevDate, l)}`, `Change since the ${day(tr.prevDate, l)} reading`), fmtDelta(tr.delta, u, l)]);
-      if (tr && tr.n >= 3 && tr.firstDate) rows.push([T(l, `Plus bas et plus haut depuis le ${day(tr.firstDate, l)}`, `Low and high since ${day(tr.firstDate, l)}`), `${fmtDays(tr.min, u, l)} · ${fmtDays(tr.max, u, l)}`]);
+      const st = stdOf(g);
+      if (st?.cur.n) {
+        rows.push([T(l, 'Norme de service d’IRCC', 'IRCC service standard'), T(l, `${fmtStd(st.cur, l)} pour ${fmtPct((st.cur.target ?? 0.8) * 100, l)} des demandes`, `${fmtStd(st.cur, l)} for ${fmtPct((st.cur.target ?? 0.8) * 100, l)} of applications`)]);
+        rows.push([T(l, `Demandes traitées dans la norme en ${fmtFy(st.fy, l)}`, `Applications processed within the standard in ${fmtFy(st.fy, l)}`), `${fmtPct(st.cur.perf, l)} ${T(l, 'sur', 'of')} ${fmtN(st.cur.total, l)}`]);
+      }
+      const ctx = context(g, c, l);
+      rows.push(...ctx.rows);
       const sub = prog.method === 'past'
-        ? T(l, `${prog.name.fr}. Délai passé : temps qu’il a fallu à IRCC pour traiter 80 % des demandes récentes.`, `${prog.name.en}. Past time: how long IRCC took to process 80% of recent applications.`)
-        : T(l, `${prog.name.fr}. Délai prospectif : temps qu’IRCC prévoit pour une demande reçue aujourd’hui.`, `${prog.name.en}. Forward-looking time: what IRCC expects for an application received today.`);
-      const table = prog.src === 'country' && !prog.fixed ? compareTable(g, c, l) : queueTable(g, applied ? (prog.src === 'tr' ? e.queue?.key : applied.slice(0, 7)) : undefined, l) ?? historyTable(r.series, u, l);
-      const second = table && prog.src !== 'noncountry' && !(prog.src === 'country' && prog.fixed) ? historyTable(r.series, u, l, 6) : undefined;
+        ? T(l, `${prog.name.fr}. IRCC affiche ici un délai passé : le temps qu’il lui a fallu pour traiter 80 % des demandes récentes.`, `${prog.name.en}. IRCC shows a past time here: how long it took to process 80% of recent applications.`)
+        : T(l, `${prog.name.fr}. IRCC affiche ici un délai prospectif : le temps qu’il prévoit pour une demande reçue aujourd’hui.`, `${prog.name.en}. IRCC shows a forward-looking time here: what it expects for an application received today.`);
       return {
-        label, value, sub, rows, table, tables: second ? [second] : undefined,
-        note: T(l, 'Estimation, pas une promesse : IRCC traite certaines demandes plus vite ou plus lentement, et le délai ne compte pas le temps de donner vos données biométriques. Date de dépôt = jour où IRCC reçoit la demande complète.', 'An estimate, not a promise: IRCC processes some applications faster or slower, and the time does not include giving your biometrics. Filing date = the day IRCC receives the complete application.'),
+        label: lab, value, sub, rows, table: ctx.table,
+        note: T(l, 'Estimation, pas une promesse : le délai vient de vous (copié de l’outil d’IRCC), la date est le jour de réception de la demande complète, et la biométrie ou une demande de documents s’ajoutent. Normes de service et volumes : données ouvertes du gouvernement du Canada (Licence du gouvernement ouvert du Canada).', 'An estimate, not a promise: the time comes from you (copied from IRCC’s tool), the date is the day IRCC received the complete application, and biometrics or a request for documents come on top. Service standards and volumes: Government of Canada open data (Open Government Licence of Canada).'),
       };
     },
   };
@@ -138,10 +136,10 @@ function citoyennete(l: Lang, arg?: Args): ToolSpec {
     inputs: [
       { id: 'pr', label: T(l, 'Jours au Canada comme résident permanent', 'Days in Canada as a permanent resident'), def: Number(arg?.pr ?? 900), max: 1825, unit: T(l, 'jours', 'days'), help: T(l, 'Dans les 5 ans avant la date de la demande, absences retirées', 'Within the 5 years before you apply, absences removed') },
       { id: 'tmp', label: T(l, 'Jours au Canada avant la résidence permanente', 'Days in Canada before permanent residence'), def: Number(arg?.tmp ?? 400), max: 1825, unit: T(l, 'jours', 'days'), help: T(l, 'Comme visiteur, étudiant, travailleur ou personne protégée, dans les mêmes 5 ans', 'As a visitor, student, worker or protected person, within the same 5 years') },
+      { id: 'n', label: T(l, 'Délai affiché par IRCC pour la citoyenneté', 'Citizenship time shown by IRCC'), def: Number(arg?.n ?? 0), max: 120, unit: T(l, 'mois', 'months'), help: T(l, 'Facultatif : recopiez le délai de l’outil d’IRCC pour estimer la date du serment', 'Optional: copy the time from IRCC’s tool to estimate the oath date'), adv: true },
     ],
     run: (v) => {
       const c = citizenship({ prDays: n(v, 'pr'), tempDays: n(v, 'tmp') }, CIT_RULE);
-      const g = readingOf('citizenship'), t = isTime(g.t) ? g.t : null;
       const earliest = addDays(READ, c.missing);
       const rows: ToolOut['rows'] = [
         [T(l, 'Jours comme résident permanent', 'Days as a permanent resident'), num(c.pr, l), c.pr],
@@ -149,65 +147,87 @@ function citoyennete(l: Lang, arg?: Args): ToolSpec {
         [T(l, `Total retenu sur ${num(CIT_RULE.required, l)} exigés`, `Total counted, of ${num(CIT_RULE.required, l)} required`), num(c.total, l)],
       ];
       if (!c.eligible) rows.push([T(l, 'Jours manquants', 'Days missing'), num(c.missing, l)], [T(l, 'Première date possible, sans nouvelle absence', 'Earliest date, with no further absence'), day(earliest, l)]);
-      if (t) rows.push([T(l, `Délai prévu par IRCC (${day(g.date, l)})`, `Time expected by IRCC (${day(g.date, l)})`), fmtTime(g.t, l)], [T(l, 'Serment vers, demande déposée à cette date', 'Oath around, applying on that date'), whenAt(addTime(c.eligible ? READ : earliest, t), t, l)]);
+      const t = Math.round(n(v, 'n'));
+      if (t > 0) rows.push([T(l, `Serment vers, avec un délai de ${num(t, l)} mois`, `Oath around, with a ${num(t, l)}-month time`), monthYear(addTime(c.eligible ? READ : earliest, { n: t, u: 'm' }), l)]);
+      const y = ops12('cit');
+      rows.push([T(l, `Nouveaux citoyens canadiens (${window12(O.months, 'fr')})`, `New Canadian citizens (${window12(O.months, 'en')})`), fmtN(y.last, l)]);
       return {
         label: T(l, 'Présence effective retenue', 'Physical presence counted'),
         value: c.eligible ? T(l, 'Seuil atteint', 'Threshold met') : T(l, `${num(c.missing, l)} jours manquants`, `${num(c.missing, l)} days short`),
         sub: T(l, `${num(c.total, l)} jours sur ${num(CIT_RULE.required, l)}, au ${day(READ, l)}`, `${num(c.total, l)} of ${num(CIT_RULE.required, l)} days, as of ${day(READ, l)}`),
         rows,
-        note: T(l, 'La fenêtre de 5 ans glisse : chaque jour qui passe en fait sortir un ancien. Le calculateur officiel d’IRCC, avec vos dates exactes de voyage, fait foi avant de déposer. Le délai de traitement court jusqu’au serment.', 'The 5-year window slides: each new day pushes an old one out. IRCC’s official calculator, with your exact travel dates, is the one to trust before you apply. The processing time runs until the oath.'),
+        note: T(l, 'La fenêtre de 5 ans glisse : chaque jour qui passe en fait sortir un ancien. Le calculateur officiel d’IRCC, avec vos dates exactes de voyage, fait foi avant de déposer.', 'The 5-year window slides: each new day pushes an old one out. IRCC’s official calculator, with your exact travel dates, is the one to trust before you apply.'),
       };
     },
   };
 }
 
-const CAT_NAMES: Record<Cat | 'all', { en: string; fr: string }> = {
-  all: { en: 'All rounds', fr: 'Toutes les rondes' }, cec: { en: 'Canadian Experience Class', fr: 'Expérience canadienne' }, pnp: { en: 'Provincial Nominee Program', fr: 'Candidats des provinces' },
-  french: { en: 'French-language proficiency', fr: 'Connaissance du français' }, trades: { en: 'Trades occupations', fr: 'Métiers spécialisés' }, health: { en: 'Healthcare and social services', fr: 'Santé et services sociaux' },
-  physicians: { en: 'Physicians with Canadian experience', fr: 'Médecins avec expérience canadienne' }, managers: { en: 'Senior managers with Canadian experience', fr: 'Cadres supérieurs avec expérience canadienne' },
-  transport: { en: 'Transport occupations', fr: 'Métiers du transport' }, military: { en: 'Skilled military recruits', fr: 'Recrues militaires qualifiées' }, stem: { en: 'STEM occupations', fr: 'Sciences, technologie, génie et mathématiques' },
-  education: { en: 'Education occupations', fr: 'Métiers de l’enseignement' }, agriculture: { en: 'Agriculture and agri-food', fr: 'Agriculture et agroalimentaire' }, fsw: { en: 'Federal Skilled Worker', fr: 'Travailleurs qualifiés du fédéral' },
-  general: { en: 'General (all programs)', fr: 'Générale (tous programmes)' }, other: { en: 'Other categories', fr: 'Autres catégories' },
-};
-export const catName = (c: Cat | 'all', l: Lang) => CAT_NAMES[c][l];
-const yearAgo = (iso: string) => `${Number(iso.slice(0, 4)) - 1}${iso.slice(4)}`;
-
 function entreeExpress(l: Lang, arg?: Args): ToolSpec {
-  const since = yearAgo(READ);
-  const present = CATS.filter((c) => ROUNDS.some((r) => r.date >= since && catOf(r.name) === c));
+  const years = [...EE_YEARS].reverse().slice(0, 6);
   return {
     inputs: [
       { id: 'crs', label: T(l, 'Votre score CRS', 'Your CRS score'), def: Number(arg?.crs ?? 480), max: 1200, help: T(l, 'Score affiché dans votre profil Entrée express', 'Score shown in your Express Entry profile') },
-      { kind: 'select', id: 'k', label: T(l, 'Catégorie de ronde', 'Round category'), def: String(arg?.k ?? 'all'), options: [{ value: 'all', label: catName('all', l) }, ...present.map((c) => ({ value: c, label: catName(c, l) }))] },
+      { kind: 'select', id: 'k', label: T(l, 'Programme d’invitation', 'Invitation program'), def: String(arg?.k ?? 'all'), options: ['all', 'cec', 'fsw', 'pnp'].map((k) => ({ value: k, label: EE_PROG[k][l] })) },
+      { kind: 'select', id: 'y', label: T(l, 'Année', 'Year'), def: String(arg?.y ?? years[1] ?? years[0]), options: years.map((y) => ({ value: y, label: y === LAST.ops.slice(0, 4) ? T(l, `${y} (année en cours)`, `${y} (year to date)`) : y })) },
     ],
     run: (v) => {
-      const k = s(v, 'k') as Cat | 'all', score = n(v, 'crs');
-      const st = eeStats(ROUNDS, k, score, since);
+      const k = s(v, 'k'), y = s(v, 'y'), score = n(v, 'crs');
+      const b = eeBandShare(y, k, score), total = eeYear(y, k);
       const rows: ToolOut['rows'] = [
-        [T(l, `Rondes depuis le ${day(since, l)}`, `Rounds since ${day(since, l)}`), num(st.n, l)],
-        [T(l, 'Invitations envoyées', 'Invitations issued'), num(st.total, l)],
+        [T(l, `Invitations ${y}, ${EE_PROG[k].fr}`, `Invitations in ${y}, ${EE_PROG[k].en}`), fmtN(total, l)],
+        [T(l, 'Votre tranche de score', 'Your score band'), b.band ? b.band.replace('-', T(l, ' à ', ' to ')) : T(l, 'hors des tranches publiées', 'outside the published bands')],
+        [T(l, 'Invitations sous votre tranche', 'Invitations below your band'), fmtPct(b.below, l)],
+        [T(l, 'Invitations dans votre tranche', 'Invitations in your band'), fmtPct(b.inBand, l)],
+        [T(l, 'Invitations au-dessus de votre tranche', 'Invitations above your band'), fmtPct(b.above, l)],
       ];
-      if (st.last) rows.push([T(l, 'Dernière ronde', 'Latest round'), `${day(st.last.date, l)} · ${num(st.last.size, l)} · ${st.last.crs ?? ''}`]);
-      if (st.lowest) rows.push([T(l, 'Score minimal le plus bas', 'Lowest cut-off'), `${st.lowest.crs} (${day(st.lowest.date, l)})`]);
-      const last = st.list.slice(0, 12);
+      const counts = eeBands(y, k);
+      const bl = (x: string) => x.replace('-', T(l, ' à ', ' to '));
+      const rowsT = EED.bandOrder.map((band, i) => [band === b.band ? `<strong>${bl(band)}</strong>` : bl(band), fmtN(counts[i], l)]).filter((_, i) => counts[i] > 0).reverse();
       return {
-        label: T(l, 'Rondes de 12 mois où votre score passait', 'Rounds in 12 months your score would have met'),
-        value: `${num(st.invitedIn, l)} ${T(l, 'sur', 'of')} ${num(st.list.filter((r) => r.crs != null).length, l)}`,
-        sub: T(l, `${catName(k, 'fr')}, score ${num(score, l)}, rondes publiées jusqu’au ${day(ROUNDS[0]?.date ?? EE_READ, l)}`, `${catName(k, 'en')}, score ${num(score, l)}, rounds published up to ${day(ROUNDS[0]?.date ?? EE_READ, l)}`),
+        label: T(l, 'Invitations allées à des scores égaux ou inférieurs à votre tranche', 'Invitations that went to scores in or below your band'),
+        value: b.band ? fmtPct(Math.round((b.below + b.inBand) * 10) / 10, l) : T(l, 'non calculable', 'not available'),
+        sub: T(l, `${EE_PROG[k].fr}, score ${num(score, l)}, ${y}`, `${EE_PROG[k].en}, score ${num(score, l)}, ${y}`),
         rows,
-        table: last.length ? {
-          caption: T(l, 'Dernières rondes de la catégorie choisie, telles qu’IRCC les publie.', 'Latest rounds in the chosen category, as IRCC publishes them.'),
-          headers: [T(l, 'Date', 'Date'), T(l, 'Ronde', 'Round'), T(l, 'Invitations', 'Invitations'), T(l, 'Score minimal', 'Cut-off'), T(l, 'Votre score', 'Your score')],
-          rows: last.map((r) => [day(r.date, l), `${r.n} · ${catName(catOf(r.name), l)}`, num(r.size, l), r.crs != null ? String(r.crs) : '', r.crs != null ? (score >= r.crs ? T(l, 'au-dessus', 'above') : T(l, `${num(r.crs - score, l)} de moins`, `${num(r.crs - score, l)} short`)) : '']),
-          align: ['l', 'l', 'r', 'r', 'r'],
-        } : undefined,
-        note: T(l, 'Les rondes passées ne disent pas où tombera la prochaine : IRCC choisit la catégorie et le nombre d’invitations à chaque ronde. Ce site ne calcule pas votre score.', 'Past rounds do not tell where the next one will fall: IRCC picks the category and the number of invitations each time. This site does not compute your score.'),
+        table: { caption: T(l, `Candidats invités en ${y} par tranche de score, ${EE_PROG[k].fr}. Source : IRCC, Entrée express, candidats invités (OGL-Canada 2.0), chiffres arrondis.`, `Candidates invited in ${y} by score band, ${EE_PROG[k].en}. Source: IRCC Express Entry invited candidates (OGL-Canada 2.0), rounded figures.`), headers: [T(l, 'Tranche de score', 'Score band'), T(l, 'Invitations', 'Invitations')], rows: rowsT, align: ['l', 'r'] },
+        note: T(l, 'Une année passée ne dit pas où tombera la prochaine ronde : IRCC choisit la catégorie et le nombre d’invitations à chaque ronde. Ce site ne calcule pas votre score.', 'A past year does not tell where the next round will fall: IRCC picks the category and the number of invitations each time. This site does not compute your score.'),
       };
     },
   };
 }
 
-export const SPECS: Record<string, (l: Lang, arg?: Args) => ToolSpec> = { delai, citoyennete, entree: entreeExpress };
+/** Profil d'un pays de citoyenneté : les indicateurs mensuels d'IRCC sur douze mois, comparés aux douze d'avant. */
+function pays(l: Lang, arg?: Args): ToolSpec {
+  return {
+    inputs: [{ kind: 'select', id: 'c', label: T(l, 'Pays de citoyenneté', 'Country of citizenship'), def: String(arg?.c ?? 'IN'), options: countryOpts(l), wide: true }],
+    run: (v) => {
+      const c = s(v, 'c') || 'IN';
+      const a = approval12(c), nt = net12(c), r = rank12('trFin', c);
+      const M: Metric[] = ['trIn', 'trFin', 'trOk', 'spFin', 'v1', 'prIn', 'copr', 'cit'];
+      const NAME: Record<Metric, [string, string]> = {
+        trIn: ['Résidence temporaire : demandes reçues', 'Temporary residence: applications received'], trFin: ['Résidence temporaire : demandes finalisées', 'Temporary residence: applications finalized'],
+        trOk: ['Résidence temporaire : demandes approuvées', 'Temporary residence: applications approved'], spFin: ['Permis d’études : nouvelles demandes finalisées', 'Study permits: new applications finalized'],
+        v1: ['Visas de visiteur approuvés (V-1)', 'Visitor visas approved (V-1)'], prIn: ['Résidence permanente : demandes reçues', 'Permanent residence: applications received'],
+        copr: ['Résidence permanente : autorisations délivrées', 'Permanent residence: authorizations issued'], cit: ['Nouveaux citoyens (pays de naissance)', 'New citizens (country of birth)'],
+      };
+      const rowsT = M.map((m) => { const y = ops12(m, c); return [T(l, NAME[m][0], NAME[m][1]), fmtN(y.last, l), fmtN(y.prev, l), fmtChange(y.change, l)]; });
+      return {
+        label: T(l, `Part approuvée, résidence temporaire, ${countryName(c, 'fr')}`, `Share approved, temporary residence, ${countryName(c, 'en')}`),
+        value: fmtPct(a.rate, l),
+        sub: T(l, `Demandes approuvées ÷ demandes finalisées, ${window12(O.months, 'fr')}`, `Applications approved ÷ applications finalized, ${window12(O.months, 'en')}`),
+        rows: [
+          [T(l, 'Demandes finalisées sur douze mois', 'Applications finalized over twelve months'), fmtN(a.fin, l)],
+          [T(l, 'Rang parmi les pays de citoyenneté', 'Rank among countries of citizenship'), r.rank ? `${num(r.rank, l)} ${T(l, 'sur', 'of')} ${num(r.of, l)}` : T(l, 'non classé', 'not ranked')],
+          [T(l, 'Part approuvée, douze mois d’avant', 'Share approved, previous twelve months'), fmtPct(a.prevRate, l)],
+          [T(l, 'Reçues moins finalisées', 'Received minus finalized'), nt.net == null ? fmtN(null, l) : `${nt.net > 0 ? '+' : ''}${num(nt.net, l)}`],
+        ],
+        table: { caption: T(l, `Citoyens de ${countryName(c, 'fr')} : douze derniers mois (${window12(O.months, 'fr')}) et douze mois d’avant. Source : IRCC, Operational Processing (OGL-Canada 2.0), chiffres arrondis à 5.`, `Citizens of ${countryName(c, 'en')}: last twelve months (${window12(O.months, 'en')}) and the twelve before. Source: IRCC Operational Processing (OGL-Canada 2.0), figures rounded to 5.`), headers: [T(l, 'Indicateur', 'Indicator'), T(l, '12 derniers mois', 'Last 12 months'), T(l, '12 mois d’avant', 'Previous 12 months'), T(l, 'Écart', 'Change')], rows: rowsT, align: ['l', 'r', 'r', 'r'] },
+        note: T(l, 'Volumes en personnes, par pays de citoyenneté (de naissance pour les nouveaux citoyens). Une part approuvée élevée ne dit rien de votre propre dossier, et les volumes ne sont pas des délais.', 'Volumes in people, by country of citizenship (of birth for new citizens). A high approval share says nothing about your own file, and volumes are not processing times.'),
+      };
+    },
+  };
+}
+
+export const SPECS: Record<string, (l: Lang, arg?: Args) => ToolSpec> = { delai, citoyennete, entree: entreeExpress, pays };
 export const TOOL_KINDS = Object.keys(SPECS);
 export function getTool(kind: string, l: Lang, arg?: Args): ToolSpec {
   const f = SPECS[kind]; if (!f) throw new Error(`simulateur inconnu : ${kind}`);
@@ -219,3 +239,5 @@ export function runTool(kind: string, l: Lang, arg?: Args, values?: V): ToolOut 
   const v = Object.fromEntries(spec.inputs.map((i) => [i.id, i.def])) as V;
   return spec.run(resolve(spec.inputs, { ...v, ...(values ?? {}) }));
 }
+// MAJOR, eeCountry : réexportés pour les pages (trousse).
+export { MAJOR, eeCountry };

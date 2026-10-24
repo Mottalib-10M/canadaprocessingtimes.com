@@ -1,101 +1,100 @@
-import { defineGuide, type Helpers } from '../../lib/page-types';
+import { defineGuide } from '../../lib/page-types';
 import { KIT as K } from '../../lib/kit';
 
-/* Catégorie de l'expérience canadienne : délai prospectif et file par mois de dépôt publiés par IRCC (flpt). */
-const P = 'cec';
-const R = K.readingOf(P);
-const Q = R.queue ?? [];
-const D = R.date;
-const T = K.fullTrend(R.series)!;
-const late = Q.filter((q) => q[1] === 'late');
-const open = Q.filter((q) => typeof q[1] === 'number');
-const firstOpen = open[0];
-const lastRow = Q[Q.length - 1];
-const lastLate = late[late.length - 1];
-const since = `${Number(K.READ.slice(0, 4)) - 1}${K.READ.slice(4)}`;
-const st = K.eeStats(K.ROUNDS, 'cec', 0, since);
-const highest = st.list.filter((x) => x.crs != null).reduce((a, x) => (x.crs! > a.crs! ? x : a), st.list[0]);
-const sample = Q[Math.max(0, Q.length - 6)];
-const sampleEst = K.estimate(P, 'IN', `${sample[0]}-15`);
-const fsw = K.readingOf('fsw');
+/* Catégorie de l'expérience canadienne : norme de service (Inventaire des services du GC), invitations
+ * (Entrée express, candidats invités) et admissions mensuelles (Permanent Residents, Monthly IRCC Updates),
+ * données ouvertes sous la Licence du gouvernement ouvert du Canada. Le délai de l'outil d'IRCC est saisi par le lecteur. */
 const E = K.en, F = K.fr;
+const M = K.PRD.months;
+const ser = K.prSeries('cec');
+const st = K.stdOf('cec')!;
+const c12 = K.pr12('cec'), all12 = K.pr12('all');
+const shareAll = K.pctOf(c12.last, all12.last);
+const yr = (y: string) => K.yearSum(ser, M, y) ?? 0;
+const full = K.EE_FULL, cur = K.EE_CUR, prevFull = String(Number(full) - 1);
+const inv = (y: string) => K.eeYear(y, 'cec');
+const invCh = K.pctOf(inv(full) - inv(prevFull), inv(prevFull));
+const invShare = K.pctOf(inv(full), K.eeYear(full));
+const invShareCur = K.pctOf(inv(cur), K.eeYear(cur));
+const perfCh = st.prev?.perf != null && st.cur.perf != null ? Math.round((st.cur.perf - st.prev.perf) * 10) / 10 : null;
+const perMonth = Math.round((c12.last ?? 0) / 12);
+const admYears = [prevFull, full].filter((y) => M.some((m) => m.startsWith(y)));
+const dirEn = (x: number | null) => (x == null ? 'unchanged' : x > 0 ? 'up' : 'down');
+const dirFr = (x: number | null) => (x == null ? 'stable' : x > 0 ? 'en hausse' : 'en baisse');
+const ptsEn = (x: number | null) => (x == null ? '' : `${E.n(Math.abs(x), 1)} points`);
+const midShare = K.pctOf(K.eeBands(full, 'cec').slice(K.EED.bandOrder.indexOf('451-500'), K.EED.bandOrder.indexOf('601-700')).reduce((a, x) => a + x, 0), inv(full));
+// Le texte dit « six mois », « première source d'invitations » et « la plupart entre 451 et 600 » : vrai tant que ces gardes passent.
+if (st.cur.n !== 6 || st.cur.u !== 'm') throw new Error('cec : la norme n’est plus de six mois, revoir titre et texte');
+if (['fsw', 'pnp'].some((k) => K.eeYear(full, k) > inv(full))) throw new Error('cec : l’expérience canadienne n’est plus la première source d’invitations');
+if ((midShare ?? 0) <= 50) throw new Error('cec : la majorité des invitations n’est plus entre 451 et 600');
+const ptsFr = (x: number | null) => (x == null ? '' : `${F.n(Math.abs(x), 1)} points`);
 
-function queueRows(h: Helpers) {
-  return Q.slice(-12).reverse().map((q) => [
-    h.my(`${q[0]}-15`),
-    typeof q[1] === 'number' ? h.d(q[1] * 365.25 / 12, 'm') : (h.lang === 'fr' ? 'délai prévu dépassé' : 'past the expected time'),
-    typeof q[1] === 'number' ? h.my(K.addMonths(D, q[1])) : '',
-    K.fmtAhead(q[2], h.lang),
-  ]);
-}
+const chEn = (x: number | null) => (x == null ? 'unchanged' : Math.abs(x) < 0.5 ? 'stable' : `${x > 0 ? 'up' : 'down'} ${K.en.pa(x)}`);
+const chFr = (x: number | null) => (x == null ? 'stable' : Math.abs(x) < 0.5 ? 'stable' : `${x > 0 ? 'en hausse' : 'en baisse'} de ${K.fr.pa(x)}`);
 
 export default defineGuide({
   id: 'cec', group: 'pr', order: 41,
   tool: 'delai', toolArg: { g: 'cec' },
   related: ['express-entry', 'fsw', 'pnp', 'express-entry-draws', 'work-permit-extension', 'beyond-processing-time'],
-  sources: ['ptimes-flpt', 'express-entry', 'ee-rounds', 'check-status'],
+  sources: ['ptimes', 'od-std', 'od-pr', 'od-ee', 'express-entry', 'ogl'],
   en: {
     slug: 'canadian-experience-class-processing-time',
-    nav: 'Canadian Experience Class', card: 'Queue by month of filing, people ahead, trend',
-    title: 'CEC Processing Time 2026, Queue and People Ahead by Month',
-    description: 'CEC processing time in 2026: the months IRCC still expects for your month of filing, people ahead of you, the CEC figure since October 2025 and recent rounds.',
-    h1: 'Canadian Experience Class processing time, month by month',
-    intro: `IRCC expects ${K.fmtTime(R.t, 'en')} for a CEC application received now, in its update of ${E.day(D)}, with about ${E.n(R.waiting ?? 0)} files in line.`,
-    resume: `A permanent residence application under the Canadian Experience Class received today should take ${K.fmtTime(R.t, 'en')}, according to the forward-looking time IRCC published on ${E.day(D)}. If you have already applied, the more useful figure is IRCC’s queue by month of filing: for files received in ${E.my(`${lastRow[0]}-15`)}, it expects ${E.n(lastRow[1] as number)} more months with ${K.fmtAhead(lastRow[2], 'en')} applications ahead, while every month up to ${E.my(`${lastLate[0]}-15`)} is marked as past the expected time. In total about ${E.n(R.waiting ?? 0)} CEC applications were waiting. Since our first dated copy of ${E.day(T.firstDate!)}, the headline time has moved between ${E.d(T.min, 'm')} and ${E.d(T.max, 'm')}. Over the twelve months to ${E.day(K.READ)}, IRCC held ${E.n(st.n)} rounds reserved to this class and sent ${E.n(st.total)} invitations, with cut-off scores from ${st.lowest?.crs} to ${highest.crs}. Enter your month of filing in the tool to read your own line.`,
+    nav: 'Canadian Experience Class', card: 'CEC decision date, six-month standard, invitations and admissions',
+    title: 'CEC Processing Time in 2026: Standard and Admissions',
+    description: 'CEC permanent residence in 2026: IRCC’s six-month standard and how often it is met, invitations, monthly admissions and your decision date from IRCC’s time.',
+    h1: 'Canadian Experience Class: standard, admissions and your decision date',
+    intro: `IRCC aims to decide 80% of Canadian Experience Class applications within ${K.fmtStd(st.cur, 'en')}; in ${K.fmtFy(st.fy, 'en')} it did so for ${E.pct(st.cur.perf)} of them.`,
+    resume: `The Canadian Experience Class is the Express Entry program for people who already have skilled work experience in Canada. After the invitation, IRCC shows the time it expects for a CEC application on its “Check processing times” tool; copy it into the calculator above with the day IRCC received your application to get an estimated decision date. IRCC’s published service standard for this program is ${K.fmtStd(st.cur, 'en')} for 80% of applications. In ${K.fmtFy(st.fy, 'en')} it met that standard for ${E.pct(st.cur.perf)} of ${E.n(st.cur.total)} applications, ${perfCh == null ? 'with no earlier year to compare' : `${dirEn(perfCh)} ${ptsEn(perfCh)} on ${K.fmtFy(st.pfy!, 'en')}`}. IRCC invited ${E.n(inv(full))} CEC candidates in ${full}, ${E.pct(invShare)} of all Express Entry invitations, and ${E.n(inv(cur))} so far in ${cur}. From ${E.w12(M)}, ${E.n(c12.last)} people were admitted as permanent residents under the CEC, ${chEn(c12.change)} on the previous twelve months, or about ${E.n(perMonth)} a month.`,
     faqs: [
-      { q: 'What does “past the expected time” mean in the CEC queue?', a: `It means IRCC no longer counts any remaining time for files received that month: they have gone beyond what IRCC planned. On ${E.day(D)}, this covered every month up to ${E.my(`${lastLate[0]}-15`)}. Most of those files are already decided; the ones still open are often waiting on a document, a check or a medical exam.` },
-      { q: 'How many people are ahead of my CEC application?', a: `IRCC publishes a rounded count of applications ahead for each month of filing. For ${E.my(`${sample[0]}-15`)}, the file of ${E.day(D)} shows ${K.fmtAhead(sample[2], 'en')}; for the latest month, ${E.my(`${lastRow[0]}-15`)}, it shows ${K.fmtAhead(lastRow[2], 'en')}. The count tells you the size of the line, not the order in which officers pick files.` },
-      { q: 'Can I keep working in Canada while my CEC application is processed?', a: 'Often yes. If your work permit is still valid, you keep working under it. If it is about to expire, IRCC offers a bridging open work permit to some permanent residence applicants, and applying to extend before expiry lets you keep your status while IRCC decides. Check the conditions on IRCC’s pages before your permit ends.' },
-      { q: 'Is the CEC processing time shorter than the FSW one in 2026?', a: `In IRCC’s update of ${E.day(D)}, the Canadian Experience Class shows ${K.fmtTime(R.t, 'en')} and the Federal Skilled Worker Program ${K.fmtTime(fsw.t, 'en')}. The order has swapped several times since October 2025, and a one-month gap is within IRCC’s rounding, so neither line is reliably faster.` },
+      { q: 'Is the Canadian Experience Class faster than the Federal Skilled Worker Program?', a: `Both share IRCC’s service standard of ${K.fmtStd(st.cur, 'en')} for 80% of applications. The difference shows in how often the standard is met and in the time IRCC displays on its tool for each program at a given moment. Compare the two times on IRCC’s tool the day you check, rather than relying on a general rule.` },
+      { q: 'Can I keep working in Canada while my CEC application is processed?', a: 'Often yes, if your work permit is still valid or you applied to extend it before it expired, which keeps your status while IRCC decides. Some applicants with a pending permanent residence application can also ask for a bridging open work permit. Check the conditions on IRCC’s pages before your permit ends.' },
+      { q: 'Why do CEC admissions not match the number of CEC invitations?', a: 'Invitations count principal applicants on the day they are invited, while admissions count every person who becomes a permanent resident, including spouses and children, in the month it happens. Months or more separate the two, some invited candidates never apply, and some applications are refused, so the two counts rarely line up within a year.' },
+      { q: 'Does the CEC processing time include the wait for an invitation?', a: 'No. The time on IRCC’s tool and the service standard start on the day IRCC receives your complete permanent residence application, which you can only submit after an invitation. Time spent in the Express Entry pool before that is not counted, and neither is time you take to answer a request from IRCC.' },
     ],
     body: (h) => `
-<h2>Where your month of filing stands</h2>
-<p>IRCC’s file does not stop at one headline time. For the Canadian Experience Class it lists every month of filing over the past three years, with the number of months it still expects and the number of applications ahead. The table shows the last twelve months as of ${h.day(D)}. The expected month is IRCC’s update date plus the months left, so it is a month, never a day.</p>
-${h.table(['Month IRCC received the file', 'Time left, per IRCC', 'Expected around', 'Applications ahead'], queueRows(h), `Canadian Experience Class queue, IRCC update of ${h.day(D)}.`, ['l', 'r', 'r', 'r'])}
-<p>The pattern is steep. Files received in ${h.my(`${firstOpen[0]}-15`)} have ${h.d((firstOpen[1] as number) * 365.25 / 12, 'm')} left with ${K.fmtAhead(firstOpen[2], h.lang)} ahead; for ${h.my(`${lastRow[0]}-15`)} the count rises to ${K.fmtAhead(lastRow[2], h.lang)}. Most of that gap is simply recent files that nobody has opened yet. The ${h.n(late.length)} oldest months are marked as past the expected time, which is IRCC’s way of saying it no longer plans any time for them.</p>
-${h.mini('delai', { p: ['m'], d: { g: P, m: sample[0], d: 15 }, t: 'Your CEC month of filing: what IRCC expects' })}
-<p>Take a file received on ${h.day(sampleEst.from)}. Adding the headline time gives ${sampleEst.date ? h.my(sampleEst.date) : ''}. IRCC’s queue for that month gives ${sampleEst.queue?.date ? h.my(sampleEst.queue.date) : ''} instead, because it reflects where those files actually sit today. When the two differ, the queue is the better guide for a file already in line, and the headline time for one not filed yet.</p>
-<h2>The headline time since October 2025</h2>
-<p>Our dated series for this line begins with the copy of ${h.day(T.firstDate!)}. Since then the figure has ranged from ${h.d(T.min, 'm')} to ${h.d(T.max, 'm')}, and now reads ${h.d(T.last, 'm')}. That stability hides the queue: the number of files waiting can grow while the headline time stays still, as long as IRCC expects to decide them at the same pace. How IRCC builds this kind of estimate is set out on the ${h.a('method', 'method page')}.</p>
-${h.hist(R.series, { max: 12, unit: 'm' })}
-<h2>Who applies under this class</h2>
-<p>The Canadian Experience Class is the Express Entry program for people who already have skilled work experience in Canada: at least one year of it, gained with authorization, in the three years before applying. Many applicants are former international students on a ${h.a('pgwp', 'post-graduation work permit')} or workers on an employer-specific permit. That profile explains why the class is often invited in rounds of its own rather than in general ones.</p>
-<h2>Rounds reserved to the class</h2>
-<p>In the twelve months to ${h.day(K.READ)}, IRCC held ${h.n(st.n)} Canadian Experience Class rounds and issued ${h.n(st.total)} invitations in them. The lowest cut-off was ${st.lowest?.crs} on ${st.lowest ? h.day(st.lowest.date) : ''}; the most recent round, on ${st.last ? h.day(st.last.date) : ''}, invited ${st.last ? h.n(st.last.size) : ''} candidates at ${st.last?.crs}. Every round listed with its date, size and cut-off is on the ${h.a('express-entry-draws', 'Express Entry rounds page')}. A rise in invitations shows up in the queue a few months later, once the invited candidates have filed.</p>
-<h2>While the file is open</h2>
-<p>Keep your status valid. A worker whose permit is about to run out can ask to extend it or, under IRCC’s conditions, apply for a bridging open work permit; the ${h.a('work-permit-extension', 'work permit extension page')} gives the time for that request. Answer document requests quickly, since the file waits for you. If your month is marked past the expected time and nothing has moved for a while, the ${h.a('beyond-processing-time', 'steps for a late application')} explain how to ask IRCC about it. The other two Express Entry lines are compared on the ${h.a('express-entry', 'Express Entry overview')}.</p>
+<h2>Your Canadian Experience Class decision date</h2>
+<p>For the Canadian Experience Class, the wait that IRCC measures begins when it receives your complete application for permanent residence, sent through your online account after an invitation to apply. IRCC shows the time it currently expects for that stage on its ${h.src('ptimes', 'Check processing times tool')}. That figure moves as files are decided and new ones arrive, so check it when you use the calculator rather than relying on an old screenshot. Enter it below with its unit and your filing date: the result is a date, not a promise, and it does not count days lost to a missing document.</p>
+${h.mini('delai', { p: ['n', 'u', 'm'], d: { g: 'cec', u: 'm' }, t: 'Your CEC application: estimated decision date' })}
+<h2>How often IRCC meets the CEC standard</h2>
+<p>IRCC’s service standard for the Canadian Experience Class is ${K.fmtStd(st.cur, 'en')} for 80% of complete electronic applications, published every year in the Government of Canada service inventory as ${h.src('od-std', 'open data')}. In ${K.fmtFy(st.fy, 'en')}, ${h.n(st.cur.met)} of ${h.n(st.cur.total)} applications were processed within it, or ${h.pct(st.cur.perf)}. ${st.prev ? `The year before, ${K.fmtFy(st.pfy!, 'en')}, the rate was ${h.pct(st.prev.perf)} of ${h.n(st.prev.total)} applications.` : ''} ${st.cur.perf != null && st.cur.perf >= 80 ? 'The 80% target was reached.' : 'The 80% target was not reached.'} If the time on IRCC’s tool is well above ${K.fmtStd(st.cur, 'en')}, the current year is likely to end below the target; if it is close, most applicants will hear back near the standard.</p>
+<h2>Invitations under the CEC</h2>
+<p>The Canadian Experience Class is the largest source of Express Entry invitations in IRCC’s ${h.src('od-ee', 'open data on invited candidates')}. In ${full}, IRCC invited ${h.n(inv(full))} CEC candidates, ${invCh != null && invCh < 0 ? `${h.pa(invCh)} fewer than` : `${h.pa(invCh)} more than`} in ${prevFull}, and that program took ${h.pct(invShare)} of all invitations. In ${cur} so far, the count stands at ${h.n(inv(cur))}, a share of ${h.pct(invShareCur)}. In ${full}, ${h.pct(midShare)} of CEC invitations went to scores between 451 and 600 points; the ${h.a('express-entry-draws', 'invitations by score band')} page shows the exact spread and lets you place your own score.</p>
+<h2>Admissions, month by month</h2>
+<p>When an application is approved and the person confirms permanent residence, IRCC counts an admission in its ${h.src('od-pr', 'permanent residents open data')}. From ${h.w12(M)}, ${h.n(c12.last)} people were admitted under the CEC, ${h.lang === 'fr' ? chFr(c12.change) : chEn(c12.change)} on the twelve months before, which is ${h.pct(shareAll)} of all new permanent residents over the same months. ${admYears.map((y) => `In ${y}, the total was ${h.n(yr(y))}.`).join(' ')} The table shows the most recent months, newest first.</p>
+${h.months(M, [['Canadian Experience Class', ser]], { max: 12, caption: 'Permanent residents admitted under the Canadian Experience Class, by month, newest first. Source: IRCC, Permanent Residents, Monthly IRCC Updates, open data; figures rounded.' })}
+<p>Admissions are a measure of output, not of waiting time: a month with many admissions can follow a large round of invitations months earlier. They do help to read the trend, since a fall in admissions while invitations rise usually means files are piling up before decisions.</p>
+<h2>Keeping status while you wait</h2>
+<p>Most CEC applicants are in Canada on a work permit, often a post-graduation work permit, and the qualifying experience must have been gained while authorized to work. Keep pay slips, contracts and a reference letter listing duties and hours for each job: IRCC compares them with the occupation you claimed, and a mismatch is a common reason for refusal. If your permit nears its end before a decision, the ${h.a('work-permit-extension', 'work permit extension')} page explains how to apply in time to keep your status. Once the calculator’s date has passed, the steps on the ${h.a('beyond-processing-time', 'application past the processing time')} page help you check your file and decide whether to contact IRCC.</p>
 `,
   },
   fr: {
     slug: 'delai-experience-canadienne',
-    nav: 'Expérience canadienne', card: 'File par mois de dépôt, personnes devant, tendance',
-    title: 'Délai de l’expérience canadienne (CEC) et file d’IRCC, 2026',
-    description: 'Délai de la catégorie de l’expérience canadienne en 2026 : mois restants selon votre mois de dépôt, demandes devant vous, évolution depuis octobre 2025.',
-    h1: 'Délai de la catégorie de l’expérience canadienne, mois par mois',
-    intro: `IRCC prévoit ${K.fmtTime(R.t, 'fr')} pour une demande de l’expérience canadienne reçue aujourd’hui, dans sa mise à jour du ${F.day(D)}, avec environ ${F.n(R.waiting ?? 0)} dossiers en file.`,
-    resume: `Une demande de résidence permanente dans la catégorie de l’expérience canadienne reçue aujourd’hui devrait prendre ${K.fmtTime(R.t, 'fr')}, selon le délai prospectif publié par IRCC le ${F.day(D)}. Si vous avez déjà déposé, le chiffre le plus utile est la file d’IRCC par mois de dépôt : pour les dossiers reçus en ${F.my(`${lastRow[0]}-15`)}, elle prévoit encore ${F.n(lastRow[1] as number)} mois avec ${K.fmtAhead(lastRow[2], 'fr')} demandes devant, alors que tous les mois jusqu’à ${F.my(`${lastLate[0]}-15`)} portent la mention « délai prévu dépassé ». Au total, environ ${F.n(R.waiting ?? 0)} demandes attendaient. Depuis notre première copie datée du ${F.day(T.firstDate!)}, le délai principal a varié entre ${F.d(T.min, 'm')} et ${F.d(T.max, 'm')}. Sur les douze mois au ${F.day(K.READ)}, IRCC a tenu ${F.n(st.n)} rondes réservées à cette catégorie et envoyé ${F.n(st.total)} invitations, avec des scores minimaux de ${st.lowest?.crs} à ${highest.crs}. Indiquez votre mois de dépôt dans l’outil pour lire votre propre ligne.`,
+    nav: 'Expérience canadienne', card: 'Date de décision, norme de six mois, invitations et admissions de l’expérience canadienne',
+    title: 'Délai de l’expérience canadienne 2026 : norme, admissions',
+    description: 'Expérience canadienne en 2026 : norme de six mois d’IRCC et taux de respect, invitations, admissions mensuelles et date de décision selon le délai d’IRCC.',
+    h1: 'Expérience canadienne : norme, admissions et votre date de décision',
+    intro: `IRCC vise une décision dans les ${K.fmtStd(st.cur, 'fr')} pour 80 % des demandes de la catégorie de l’expérience canadienne ; en ${K.fmtFy(st.fy, 'fr')}, il y est parvenu pour ${F.pct(st.cur.perf)} d’entre elles.`,
+    resume: `La catégorie de l’expérience canadienne est le programme de l’Entrée express destiné aux personnes qui ont déjà une expérience de travail qualifié au Canada. Après l’invitation, IRCC affiche dans son outil « Vérifier les délais de traitement » le délai qu’il prévoit pour une demande de cette catégorie ; recopiez-le dans le calculateur ci-dessus avec le jour où IRCC a reçu votre demande pour obtenir une date de décision estimée. La norme de service publiée par IRCC pour ce programme est de ${K.fmtStd(st.cur, 'fr')} pour 80 % des demandes. En ${K.fmtFy(st.fy, 'fr')}, elle a été tenue pour ${F.pct(st.cur.perf)} des ${F.n(st.cur.total)} demandes, ${perfCh == null ? 'sans année antérieure pour comparer' : `${dirFr(perfCh)} de ${ptsFr(perfCh)} par rapport à ${K.fmtFy(st.pfy!, 'fr')}`}. IRCC a invité ${F.n(inv(full))} candidats de l’expérience canadienne en ${full}, soit ${F.pct(invShare)} des invitations de l’Entrée express, et ${F.n(inv(cur))} depuis le début de ${cur}. De ${F.w12(M)}, ${F.n(c12.last)} personnes ont été admises comme résidents permanents dans cette catégorie, ${chFr(c12.change)} sur les douze mois d’avant, soit environ ${F.n(perMonth)} par mois.`,
     faqs: [
-      { q: 'Que veut dire « délai prévu dépassé » dans la file de l’expérience canadienne ?', a: `IRCC ne compte plus aucun temps restant pour les dossiers reçus ce mois-là : ils ont dépassé ce qu’il avait prévu. Le ${F.day(D)}, c’était le cas de tous les mois jusqu’à ${F.my(`${lastLate[0]}-15`)}. La plupart de ces dossiers sont déjà tranchés ; ceux qui restent ouverts attendent souvent un document, une vérification ou un examen médical.` },
-      { q: 'Combien de personnes sont devant ma demande de l’expérience canadienne ?', a: `IRCC publie, pour chaque mois de dépôt, un nombre arrondi de demandes devant. Pour ${F.my(`${sample[0]}-15`)}, le fichier du ${F.day(D)} indique ${K.fmtAhead(sample[2], 'fr')} ; pour le dernier mois, ${F.my(`${lastRow[0]}-15`)}, ${K.fmtAhead(lastRow[2], 'fr')}. Ce nombre donne la taille de la file, pas l’ordre dans lequel les agents prennent les dossiers.` },
-      { q: 'Puis-je continuer à travailler au Canada pendant le traitement de ma demande CEC ?', a: 'Souvent, oui. Tant que votre permis de travail est valide, vous travaillez sous ce permis. S’il arrive à échéance, IRCC offre à certains demandeurs de résidence permanente un permis de travail ouvert transitoire, et une demande de prolongation faite avant l’échéance maintient votre statut pendant la décision. Vérifiez les conditions sur les pages d’IRCC avant la fin du permis.' },
-      { q: 'Le délai de l’expérience canadienne est-il plus court que celui des travailleurs qualifiés du fédéral ?', a: `Dans la mise à jour d’IRCC du ${F.day(D)}, l’expérience canadienne affiche ${K.fmtTime(R.t, 'fr')} et le Programme des travailleurs qualifiés du fédéral ${K.fmtTime(fsw.t, 'fr')}. L’ordre s’est inversé plusieurs fois depuis octobre 2025, et un mois d’écart reste dans l’arrondi d’IRCC : aucune des deux files n’est plus rapide à coup sûr.` },
+      { q: 'L’expérience canadienne est-elle plus rapide que les travailleurs qualifiés du fédéral ?', a: `Les deux programmes ont la même norme de service d’IRCC, ${K.fmtStd(st.cur, 'fr')} pour 80 % des demandes. L’écart se voit dans la fréquence à laquelle la norme est tenue et dans le délai affiché par l’outil d’IRCC pour chaque programme à un moment donné. Comparez les deux délais dans l’outil d’IRCC le jour où vous vérifiez, plutôt que de vous fier à une règle générale.` },
+      { q: 'Puis-je continuer à travailler au Canada pendant l’examen de ma demande d’expérience canadienne ?', a: 'Souvent oui, si votre permis de travail est encore valide ou si vous avez demandé sa prolongation avant son expiration, ce qui maintient votre statut pendant la décision. Certains demandeurs dont la demande de résidence permanente est en cours peuvent aussi demander un permis de travail ouvert transitoire. Vérifiez les conditions sur les pages d’IRCC avant la fin du permis.' },
+      { q: 'Pourquoi les admissions de l’expérience canadienne ne correspondent-elles pas aux invitations ?', a: 'Les invitations comptent les demandeurs principaux le jour où ils sont invités, alors que les admissions comptent chaque personne qui devient résident permanent, époux et enfants compris, le mois où cela se produit. Des mois séparent les deux, certains invités ne déposent jamais de demande et certaines demandes sont refusées : les deux nombres concordent rarement sur une année.' },
+      { q: 'Le délai de l’expérience canadienne inclut-il l’attente d’une invitation ?', a: 'Non. Le délai de l’outil d’IRCC et la norme de service partent du jour où IRCC reçoit votre demande complète de résidence permanente, que vous ne pouvez envoyer qu’après une invitation. Le temps passé avant dans le bassin de l’Entrée express n’est pas compté, pas plus que le temps pris pour répondre à une demande d’IRCC.' },
     ],
     body: (h) => `
-<h2>Où en est votre mois de dépôt</h2>
-<p>Le fichier d’IRCC ne s’arrête pas à un délai principal. Pour l’expérience canadienne, il liste chaque mois de dépôt des trois dernières années, avec le nombre de mois encore prévus et le nombre de demandes devant. Le tableau reprend les douze derniers mois au ${h.day(D)}. Le mois attendu est la date de mise à jour d’IRCC plus les mois restants : c’est un mois, jamais un jour précis.</p>
-${h.table(['Mois de réception du dossier', 'Temps restant selon IRCC', 'Attendu vers', 'Demandes devant'], queueRows(h), `File de l’expérience canadienne, mise à jour d’IRCC du ${h.day(D)}.`, ['l', 'r', 'r', 'r'])}
-<p>La pente est forte. Les dossiers reçus en ${h.my(`${firstOpen[0]}-15`)} ont encore ${h.d((firstOpen[1] as number) * 365.25 / 12, 'm')} devant eux, avec ${K.fmtAhead(firstOpen[2], h.lang)} demandes devant ; pour ${h.my(`${lastRow[0]}-15`)}, le nombre monte à ${K.fmtAhead(lastRow[2], h.lang)}. L’essentiel de cet écart, ce sont des dossiers récents que personne n’a encore ouverts. Les ${h.n(late.length)} mois les plus anciens portent la mention « délai prévu dépassé » : IRCC ne leur prévoit plus de temps.</p>
-${h.mini('delai', { p: ['m'], d: { g: P, m: sample[0], d: 15 }, t: 'Votre mois de dépôt CEC : ce que prévoit IRCC' })}
-<p>Prenons un dossier reçu le ${h.day(sampleEst.from)}. Le délai principal ajouté à cette date donne ${sampleEst.date ? h.my(sampleEst.date) : ''}. La file d’IRCC pour ce mois donne plutôt ${sampleEst.queue?.date ? h.my(sampleEst.queue.date) : ''}, parce qu’elle reflète la position réelle de ces dossiers aujourd’hui. Quand les deux diffèrent, la file guide mieux un dossier déjà déposé, et le délai principal un dossier à venir.</p>
-<h2>Le délai principal depuis octobre 2025</h2>
-<p>Notre série datée commence avec la copie du ${h.day(T.firstDate!)}. Depuis, le chiffre est allé de ${h.d(T.min, 'm')} à ${h.d(T.max, 'm')}, et il indique aujourd’hui ${h.d(T.last, 'm')}. Cette stabilité cache la file : le nombre de dossiers en attente peut grossir sans que le délai principal bouge, tant qu’IRCC prévoit de les trancher au même rythme. La façon dont IRCC construit ce genre d’estimation est décrite sur la ${h.a('method', 'page de méthode')}.</p>
-${h.hist(R.series, { max: 12, unit: 'm' })}
-<h2>Qui dépose dans cette catégorie</h2>
-<p>La catégorie de l’expérience canadienne est le programme de l’Entrée express réservé aux personnes qui ont déjà une expérience de travail qualifié au Canada : au moins un an, acquise avec autorisation, dans les trois ans qui précèdent la demande. Beaucoup de demandeurs sont d’anciens étudiants étrangers titulaires d’un ${h.a('pgwp', 'permis de travail postdiplôme')}, ou des travailleurs liés à un employeur. Ce profil explique pourquoi la catégorie est souvent invitée dans des rondes à part plutôt que dans des rondes générales.</p>
-<h2>Les rondes réservées à la catégorie</h2>
-<p>Sur les douze mois au ${h.day(K.READ)}, IRCC a tenu ${h.n(st.n)} rondes de l’expérience canadienne et y a envoyé ${h.n(st.total)} invitations. Le score minimal le plus bas a été de ${st.lowest?.crs}, le ${st.lowest ? h.day(st.lowest.date) : ''} ; la ronde la plus récente, le ${st.last ? h.day(st.last.date) : ''}, a invité ${st.last ? h.n(st.last.size) : ''} candidats à partir de ${st.last?.crs}. Chaque ronde, avec sa date, sa taille et son score minimal, figure sur la ${h.a('express-entry-draws', 'page des rondes de l’Entrée express')}. Une hausse des invitations se voit dans la file quelques mois plus tard, une fois que les candidats invités ont déposé.</p>
-<h2>Pendant que le dossier est ouvert</h2>
-<p>Gardez un statut valide. Un travailleur dont le permis arrive à échéance peut en demander la prolongation ou, aux conditions d’IRCC, demander un permis de travail ouvert transitoire ; la ${h.a('work-permit-extension', 'page de la prolongation du permis de travail')} donne le délai de cette demande. Répondez vite aux demandes de documents : le dossier vous attend. Si votre mois porte la mention « délai prévu dépassé » et que rien ne bouge depuis un moment, les ${h.a('beyond-processing-time', 'démarches pour une demande en retard')} expliquent comment interroger IRCC. Les deux autres files de l’Entrée express sont comparées sur la ${h.a('express-entry', 'page d’ensemble de l’Entrée express')}.</p>
+<h2>Votre date de décision pour l’expérience canadienne</h2>
+<p>Pour la catégorie de l’expérience canadienne, l’attente mesurée par IRCC commence quand il reçoit votre demande complète de résidence permanente, envoyée depuis votre compte en ligne après une invitation à présenter une demande. IRCC affiche le délai qu’il prévoit actuellement pour cette étape dans son ${h.src('ptimes', 'outil « Vérifier les délais de traitement »')}. Ce chiffre bouge au fil des décisions et des nouveaux dossiers : consultez-le au moment d’utiliser le calculateur plutôt que de vous fier à une ancienne capture. Saisissez-le ci-dessous avec son unité et votre date de dépôt : le résultat est une date, pas une promesse, et il ne compte pas les jours perdus pour un document manquant.</p>
+${h.mini('delai', { p: ['n', 'u', 'm'], d: { g: 'cec', u: 'm' }, t: 'Votre demande d’expérience canadienne : date de décision estimée' })}
+<h2>À quelle fréquence IRCC tient la norme</h2>
+<p>La norme de service d’IRCC pour l’expérience canadienne est de ${K.fmtStd(st.cur, 'fr')} pour 80 % des demandes électroniques complètes ; elle est publiée chaque année dans l’inventaire des services du gouvernement du Canada, en ${h.src('od-std', 'données ouvertes')}. En ${K.fmtFy(st.fy, 'fr')}, ${h.n(st.cur.met)} des ${h.n(st.cur.total)} demandes ont été traitées dans ce délai, soit ${h.pct(st.cur.perf)}. ${st.prev ? `L’exercice précédent, ${K.fmtFy(st.pfy!, 'fr')}, le taux était de ${h.pct(st.prev.perf)} sur ${h.n(st.prev.total)} demandes.` : ''} ${st.cur.perf != null && st.cur.perf >= 80 ? 'La cible de 80 % a été atteinte.' : 'La cible de 80 % n’a pas été atteinte.'} Si le délai de l’outil d’IRCC dépasse nettement ${K.fmtStd(st.cur, 'fr')}, l’exercice en cours risque de finir sous la cible ; s’il en est proche, la plupart des demandeurs auront une réponse autour de la norme.</p>
+<h2>Les invitations de l’expérience canadienne</h2>
+<p>L’expérience canadienne est la première source d’invitations de l’Entrée express dans les ${h.src('od-ee', 'données ouvertes sur les candidats invités')}. En ${full}, IRCC a invité ${h.n(inv(full))} candidats de cette catégorie, ${invCh != null && invCh < 0 ? `soit ${h.pa(invCh)} de moins` : `soit ${h.pa(invCh)} de plus`} qu’en ${prevFull}, et elle a reçu ${h.pct(invShare)} de toutes les invitations. En ${cur} jusqu’ici, le compte est de ${h.n(inv(cur))}, soit une part de ${h.pct(invShareCur)}. En ${full}, ${h.pct(midShare)} des invitations de l’expérience canadienne sont allées à des scores entre 451 et 600 points ; la page des ${h.a('express-entry-draws', 'invitations par tranche de score')} donne la répartition exacte et situe votre propre score.</p>
+<h2>Les admissions, mois par mois</h2>
+<p>Quand une demande est acceptée et que la personne confirme sa résidence permanente, IRCC compte une admission dans ses ${h.src('od-pr', 'données ouvertes sur les résidents permanents')}. De ${h.w12(M)}, ${h.n(c12.last)} personnes ont été admises au titre de l’expérience canadienne, ${h.lang === 'fr' ? chFr(c12.change) : chEn(c12.change)} sur les douze mois d’avant, soit ${h.pct(shareAll)} de tous les nouveaux résidents permanents de la période. ${admYears.map((y) => `En ${y}, le total était de ${h.n(yr(y))}.`).join(' ')} Le tableau montre les mois les plus récents, du plus récent au plus ancien.</p>
+${h.months(M, [['Expérience canadienne', ser]], { max: 12, caption: 'Résidents permanents admis dans la catégorie de l’expérience canadienne, par mois, du plus récent au plus ancien. Source : IRCC, Résidents permanents, mises à jour mensuelles, données ouvertes ; chiffres arrondis.' })}
+<p>Les admissions mesurent la production, pas l’attente : un mois riche en admissions peut suivre une grosse ronde d’invitations plusieurs mois plus tôt. Elles aident pourtant à lire la tendance : des admissions en baisse alors que les invitations montent signalent en général des dossiers qui s’accumulent avant décision.</p>
+<h2>Garder son statut pendant l’attente</h2>
+<p>La plupart des demandeurs de l’expérience canadienne sont au Canada avec un permis de travail. Si le permis arrive à échéance avant la décision, la page sur la ${h.a('work-permit-extension', 'prolongation du permis de travail')} explique comment demander à temps pour garder votre statut. Une fois la date du calculateur passée, la page sur la ${h.a('beyond-processing-time', 'demande qui dépasse le délai')} aide à vérifier le dossier et à décider s’il faut écrire à IRCC.</p>
 `,
   },
 });
